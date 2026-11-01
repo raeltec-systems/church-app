@@ -1,0 +1,13 @@
+command: npm run ci:function-imports
+cwd: .
+head: c96cd562b2650c37f5d3d879cb12891419700139
+started_utc: 2026-10-30T19:29:09.339380+00:00
+
+
+> ci:function-imports
+> node tools/ci/check-function-imports.mjs
+
+function imports: every relative import stays inside supabase/functions/
+
+finished_utc: 2026-10-30T19:29:09.469433+00:00
+exit_code: 0

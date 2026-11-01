@@ -1,0 +1,17 @@
+command: flutter precache --web --linux --no-android --no-ios --no-windows --no-macos --no-fuchsia
+cwd: .
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:38:01.972266+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+[1/8] Linux SDK
+  ├─ [1/3] linux-x64-debug/linux-x64-flutter-gtk                 2,137ms
+  ├─ [2/3] linux-x64-profile/linux-x64-flutter-gtk                 775ms
+  └─ [3/3] linux-x64-release/linux-x64-flutter-gtk                  3.7s
+[8/8] linux-x64/font-subset                                        251ms
+
+finished_utc: 2026-10-30T19:38:11.225193+00:00
+exit_code: 0

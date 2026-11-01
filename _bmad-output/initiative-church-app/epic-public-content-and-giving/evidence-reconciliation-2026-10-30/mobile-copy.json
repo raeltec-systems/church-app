@@ -1,0 +1,10 @@
+{
+  "source_commit": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "source_root": "apps/mobile",
+  "validation_copy": "../mobile-validation/apps/mobile",
+  "source_files": 116,
+  "all_files_equal_checkout_before_pub_get": true,
+  "source_manifest_sha256": "13f20a03638012d6d2d48939b2361d5495fe63c7ee1d6ea933f7fbdb58d3e8bd",
+  "packages": "symlink to current checkout packages; no runtime-source differences from commit at setup",
+  "reason": "Isolate Flutter-generated native plugin files from the active checkout. No original tracked file restoration required."
+}

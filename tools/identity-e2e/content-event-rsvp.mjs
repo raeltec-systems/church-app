@@ -25,6 +25,7 @@
 // names or paths. Everything it created (rows and Storage objects) is removed.
 //
 // Usage: node tools/identity-e2e/content-event-rsvp.mjs [--evidence <file.jsonl>]
+import { removeLocalEdgeRuntime } from '../auth-harness/local-target.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
@@ -421,7 +422,7 @@ async function main() {
         try { process.kill(-serve.pid, 'SIGINT'); } catch { /* gone */ }
       }
       await sleep(2000);
-      try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+      try { removeLocalEdgeRuntime(); } catch { /* not running */ }
     }
     if (marked) {
       psql(`delete from app.platform_environment where set_by = 'content-event-rsvp-e2e';

@@ -1,0 +1,11 @@
+{
+    "head":  "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "exit":  0,
+    "finished_at_utc":  "2026-10-31T08:36:16.5628863Z",
+    "artifact_sha256":  "5075862587a9cbd8d352ec418f005830b4db1104d45917206d75ca9e15cdd6fe",
+    "command":  "flutter build apk --debug --no-pub --dart-define-from-file=\u003cprivate-local-public-client-config\u003e",
+    "scope":  "Android compile check only; local backend, debug signing, no Firebase push config, not installed or distributed",
+    "result":  "run-passed",
+    "started_at_utc":  "2026-10-31T08:32:52.4928219Z",
+    "artifact_bytes":  183406254
+}

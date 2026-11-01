@@ -1,0 +1,214 @@
+# Epic 7 canonical breakdown, adopted 2026-10-31 after Israel approved both decisions.
+# Approval: recommended 14-story grouping, sequence and proposed human checkpoints.
+# Source: tickets.proposed.toml at 34f273a9d31480be07e9a71eb84e502c486dd886.
+# The parsed entries are unchanged from the reviewed proposal; see adoption-2026-10-31.md.
+# CAP-8 and the existing epic envelope remain the requirement source; no new local IDs.
+# IDs are stable; table order is the approved build order. Estimation is disabled.
+# Adoption does not approve Q4/Q6/Q8 values, story plans, acceptance, merge or deployment.
+# Each personal-data entry ships its own current-access, lifecycle, deletion and safe-cache behavior.
+# Entry 10 integrates those effects; it is never permission to postpone them.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Record a historical meeting register through staff and mobile"
+description = "Deliver CAP-8's first usable register by reviewing attendance access, deletion and the high-uncertainty report-care boundary with the owner at the first planning checkpoint, then letting a scoped leader or assistant open an existing meeting from normal staff and mobile navigation, record its held status through Cells, save Present, Absent, Excused or Unrecorded against the roster applicable to its effective start, and reopen the same server records on the other client with current-access and lifecycle protections already registered."
+verify = "Using isolated fictional fixtures, record a held meeting containing accountless and later-transferred members, keep later joiners out of its historical roster, save a partly completed register on staff web and reopen it on mobile, then prove cancelled, not-held and unrecorded meeting facts remain distinct, cross-cell and ungranted reads fail, logout clears protected state, and no attendance is inferred from a duty response or Cannot attend notice."
+covers = ["CAP-8"]
+after = ["2.3", "2.6", "2.10", "2.11", "4.16", "5.1", "5.8", "5.9"]
+hitl = true
+risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
+unknown = "Q4 attendance retention and reader boundaries, Q6 accountable operators, corrected-time roster treatment and the proposed report-care authority/lifecycle contract need early review before affected behavior; the private-report implementation follows stable attendance/visitor contracts in entry 7, while fictional proof may proceed only where unresolved policy cannot change its result."
+external_check = "An independent reviewer checks the historical-roster query, authority and lifecycle hooks and denied direct API reads, then observes the real staff-to-mobile persistence journey beyond the story's own tests."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows", "supabase/migrations/20261028130727_cells_record_roster.sql", "supabase/migrations/20261015190139_duties_owner_decisions.sql", "docs/runbooks/identity-access.md", "docs/runbooks/contracts-and-owner-seams.md#cells-meeting-reference-story-58"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Correct attendance and recover incomplete or conflicting saves"
+description = "Complete CAP-8's register editing on both clients with attributed corrections and preserved prior revisions, explicit roster and recording completeness, current-role checks, accessible state controls, and recoverable failed or uncertain submissions that reuse the original request without silently overwriting another leader's work."
+verify = "Two real clients edit the same register concurrently, an interrupted request is retried with the same request ID and payload, and a leader corrects a historical state with a reason, proving one authorized result, visible conflict recovery, preserved history, distinct Unrecorded versus observed zero totals, rejection after scope revocation, and no durable private register cache."
+covers = ["CAP-8"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "The build must choose and document row versus aggregate revision granularity and the roster snapshot anchor before coding, without weakening attributed history or the owner's approved correction boundary."
+external_check = "An independent concurrency and privacy review exercises separate sessions and inspects persistence and history after stale-write, duplicate-request and revoked-grant races."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-12--recorded-observations-and-comparable-metrics-adopted", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides", "packages/client_core/lib/src/application/cell_controllers.dart"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Review recorded absence streaks and assign accountable follow-up"
+description = "Deliver CAP-8's absence follow-up from three consecutive recorded held-meeting absences and canonical tasks, and as the earliest consumer implement the missing shared Follow-ups direct-contact adapter so accountless or security-held recipients create an idempotent generic need in the authorized leader's existing supervision/routing workflow, where the leader can open permitted context and record attributed action or handover, with current-source checks and cancellation on stale source, withdrawal or closure rather than a new tracker or scheduler."
+verify = "Exercise Present/Excused streak breaks, cancelled/not-held skips, incomplete-data review and attendance corrections, then run real reminders for accountless and security-held task recipients and let the authorized leader find Needs direct contact and record an attempt or review on both clients, proving no false flag or hold disclosure, no duplicate need on retry, preserved terminal episode history and cancellation after source correction, reassignment, withdrawal or closure races."
+covers = ["CAP-8"]
+after = [2, "3.2", "3.3", "3.4", "3.5", "4.6", "4.7", "4.11", "4.12"]
+hitl = false
+risk = "high"
+unknown = "Story 3.5 supplies only the direct-contact registration seam and existing Follow-ups ends these reminders no_direct_contact_route, so this entry must deliver the shared adapter and accountable visible fallback consumed by entries 5 and 9, while specifying immutable absence episodes and correction effects without changing the approved task or contact policy."
+external_check = "An independent reviewer checks streak and task-source authority, runs real worker retries and correction/closure/reassignment races for accountless and held recipients, and observes the leader finding and resolving the need through the normal shared UI without private payloads or a second task."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#follow-up-tasks", "docs/runbooks/follow-ups.md#story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule", "docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35", "docs/runbooks/notifications.md#story-35-recipients-routed-by-current-access-work-retired-on-lifecycle-events", "supabase/migrations/20261014130535_followups_reminders.sql", "packages/contracts/fixtures/v1/task_source.json"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Record visitors with only agreed details and contact preferences"
+description = "Deliver CAP-8's consent-aware visitor capture from the normal meeting workflow on staff and mobile, supporting name-only visitors and optional agreed contact details with provenance and contact preferences, separate restricted storage and reads, current cell authorization, safe audit metadata and complete lifecycle and deletion handling for every new personal field."
+verify = "Record a name-only visitor and a visitor permitting one contact route, recover a refused or interrupted save, and reopen both from the authorized meeting workflow, proving no required phone, no automatic member or account match, no private contacts in Admin-only or other-cell responses, no leaked fields in logs or task labels, and erasure and stale-session denial under the approved policy."
+covers = ["CAP-8"]
+after = [1, 3, "2.3"]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+unknown = "Q4 must settle visitor consent wording and provenance, permitted fields and readers, youth safeguards and retention/deletion/backup handling before affected live capture; only approved fictional fixtures may exercise undecided mechanisms."
+external_check = "An independent reviewer checks direct API and field-level authorization, consent provenance, under-18 fail-closed behavior and the actual deletion hooks, then reviews the staff/mobile consent form against the approved design."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Work visitor follow-up and stop contact after consent withdrawal"
+description = "Deliver CAP-8's visitor contact workflow through canonical tasks and My follow-ups with permitted context, outcomes and Waiting review dates, consuming entry 3's shared adapter so accountless or security-held task recipients create an accountable need in the leader's existing supervision view, and make consent withdrawal stop authorized contact, remove stale needs and cancel obsolete reminders while preserving only allowed history and requiring a distinct approved episode for renewed consent."
+verify = "Work a visitor task from owner and supervisor screens with accountless and security-held recipient cases, let the leader record attributed direct contact from the shared need, then race withdrawal against task updates and worker retries, proving no stale authorized action or context, no hold or contact details in generic emissions, no duplicate need/tracker, prompt need cancellation and no reopening of a terminal task."
+covers = ["CAP-8"]
+after = [3, 4, "3.2", "3.5", "4.6", "4.7", "4.11", "4.12"]
+hitl = false
+risk = "high"
+unknown = "Q4 must define the permitted assignee contact view and renewed-consent procedure; the build must reconcile consent episodes with the existing cells_visitor/visitor_follow_up fixture contract or explicitly version a reviewed contract change."
+external_check = "An independent authorization and concurrency check exercises withdrawal against real task and direct-contact worker activity for accountless and held recipients, inspecting source checks, idempotent needs, leader UI recovery and safe terminal history."
+references = ["docs/runbooks/follow-ups.md", "docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35", "packages/contracts/fixtures/v1/task_source.json", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-7--one-accountable-follow-up-registry-adopted"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Invite and review joining without automatic identity matching"
+description = "Deliver CAP-8's reviewed joining path from a consented visitor relationship into the existing phone-and-password application or assisted accountless registration, giving leaders an ordinary in-app next step and an agreed in-person or contact-route invitation while preserving independent identity review, church approval, cell confirmation and the existing member ID when a relationship is explicitly linked."
+verify = "Walk through a visitor with a personal account, a visitor needing accountless registration and a shared-contact-number conflict from the normal staff/mobile flows, proving no mandatory email or SMS, no invented credentials or automatic matching, no private access before the required approvals, correct later reviewed linking and immediate rejection if contact consent is withdrawn."
+covers = ["CAP-8"]
+after = [4, 5, "2.4", "2.5", "2.6"]
+hitl = false
+risk = "high"
+unknown = "The owner must approve the visitor invitation/contact procedure and staff responsibility under Q4/Q6; invitations must not introduce an unapproved outbound messaging provider or bypass existing identity review."
+external_check = "An independent identity reviewer tests shared phones, existing and accountless member links, stale approval and withdrawal races, and observes one complete approved joining path."
+references = ["docs/runbooks/identity-access.md", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#joining-from-the-app", "_bmad-output/initiative-church-app/owner-decisions-milestone-1.md"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Draft and submit private weekly reports with explicit care grants"
+description = "Deliver CAP-8's leader and assistant report authoring on staff and essential mobile surfaces with topic, discussion, permitted testimonies and actual attendance coverage, physically and contractually separate prayer/pastoral fields, real registered report-care scopes beyond a Pastor title, revisioned draft/submission/correction behavior and complete lifecycle/deletion hooks, with no recap publication side effect."
+verify = "Draft, submit, reopen and correct a report through both clients, including a recoverable failed save and two-session conflict, then inspect direct API results for Guest, Pending, Member, other-cell leader, Media, Admin, Pastor without a care scope and combined roles, proving only currently authorized readers receive private fields and submission never creates a recap or public record."
+covers = ["CAP-8"]
+after = [2, 4, 6, "2.3", "5.8"]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+unknown = "Q4/Q6 must approve report field audiences, named pastoral reviewers and content retention; the build must settle report snapshot-versus-current attendance presentation and permitted correction transitions without copying Epic 5's broader programme-oversight rule into care authorization."
+external_check = "An independent permission review verifies the new scope registration, storage/API separation, Admin-plus-Pastor denial without care scope, protected-state invalidation and report deletion, and observes real authoring and correction."
+references = ["supabase/migrations/20261006234820_identity_grants.sql", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#roles-and-permissions", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows", "docs/design-handoff/screenshots/admin-07-meeting-report.png"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Review authorized reports and show safe submission gaps"
+description = "Deliver CAP-8's cell/week report review through normal role-aware staff navigation and essential mobile access, letting explicitly authorized pastoral reviewers read the permitted report while giving Admin a separate operational list of accountable leader, cell, submission state and deadline metadata that never fetches or renders private care content."
+verify = "Review submitted, missing and legitimately empty authorized records on both clients, follow a permitted report deep link, revoke the reader's care grant while the page is open and retry a failed read, proving current-access denial, explicit failure versus empty states, no private fields in Admin routing metadata and no visit or recap action that only simulates completion."
+covers = ["CAP-8"]
+after = [7]
+hitl = false
+risk = "high"
+unknown = "Q6 names operational and pastoral reviewers and Q4 governs the fields each may see; actual missing-report task routing and reminders arrive in entry 9, so this entry must not expose a nonfunctional routing action."
+external_check = "An independent reviewer compares authorized and denied network responses and checks role navigation, selected-report state and revoked-scope recovery against the actual design reference."
+references = ["docs/design-handoff/screenshots/admin-10-cell-reports.png", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Route missing reports and apply their source-specific reminders"
+description = "Deliver CAP-8's missing-report workflow through canonical cells_meeting/missing_report tasks, safe Admin routing and actual report submission, replacing generic scheduling with the approved day-after/day-three rule and explicitly consuming entry 3's adapter so accountless or security-held report owners remain actionable in the authorized leader's supervision view even though this source suppresses the generic supervisor alert, with meeting-state checks and atomic cancellation of obsolete reminders and contact needs."
+verify = "Under an explicit fictional clock policy exercise held, cancelled, not-held and unrecorded meetings with accountless and security-held report owners, complete the leader's normal direct-contact response and route handover where needed, then race submission, reassignment and worker retries, proving exactly the configured reminder opportunities, no generic supervisor substitute, one current accountable fallback need, obsolete-need cancellation and no care text or hold reason in broad responses."
+covers = ["CAP-8"]
+after = [3, 7, 8, "3.2", "3.3", "3.4", "3.5", "4.7", "4.11", "4.12"]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+unknown = "Q8 must settle the exact Africa/Lusaka clock and anchor for day-after/day-three deadlines and the reporting obligation of not-held or unresolved meeting records before live scheduling; existing Q2 approval means no quiet hours and does not settle these source-specific values."
+external_check = "An independent reviewer runs the real scheduler/worker with accountless and held report owners, verifies the shared direct-contact need remains actionable without a generic supervisor alert, races submission and reassignment, and checks deduplication, cancellation and Admin privacy."
+references = ["docs/runbooks/follow-ups.md#story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule", "docs/runbooks/follow-ups.md#source-specific-schedules-source-owners-in-their-own-migration", "docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#follow-up-tasks", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "packages/contracts/fixtures/v1/source_ref.json"]
+
+[[entry]]
+id = 10
+type = "story"
+title = "Verify integrated lifecycle, handover and erasure across cell records"
+description = "Complete CAP-8's integrated lifecycle across the protections already shipped by each data story, enforcing immediate denial after successful revocation, security hold or unlink while preserving attendance facts and accountable handover, and honoring an ordinary last-responsible-leader revoke's handover_required rollback by showing its refusal and requiring approved handover followed by retry rather than claiming the grant ended or bypassing the safeguard."
+verify = "Run the cross-client lifecycle matrix with active and terminal contact episodes, accountless members and a last responsible leader, proving an ordinary handover_required revoke changes no grant and is visibly refused until authorized handover/retry succeeds, successful revocation and security hold/unlink deny access despite pending obligations, obsolete contact needs cancel, and transfer, approved erasure and recovery-journal replay preserve only permitted facts."
+covers = ["CAP-8"]
+after = [2, 3, 5, 6, 7, 8, 9, "2.10", "2.11", "4.12", "4.16", "5.9"]
+hitl = false
+risk = "high"
+unknown = "Any remaining Q4 retention or backup policy prevents the affected live operation from activation, not access denial; this entry cannot retroactively justify earlier stories omitting their lifecycle or deletion protections."
+external_check = "An independent lifecycle/privacy review uses separate sessions to distinguish refused-and-rolled-back ordinary revocation from successful security denial, checks approved handover/retry and fallback-need cancellation, and validates every store's deletion and recovery behavior."
+references = ["docs/runbooks/identity-access.md", "docs/runbooks/duties.md#decision-10-the-last-leaders-scope-cannot-be-revoked-first-cross-epic-identity-change", "supabase/migrations/20261015190139_duties_owner_decisions.sql", "docs/runbooks/follow-ups.md#story-412-lifecycle-and-handover-of-follow-up-tasks", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Expose scoped attendance coverage and permission-preserving report references"
+description = "Deliver CAP-8's scoped owner contracts for later recaps, care referrals and trends by exposing actual meeting and leader facts plus historical-roster attendance coverage with explicit period, denominator, missingness and definition version, and an opaque authorized report referral reference that never copies private notes, publishes a recap or schedules a visit."
+verify = "Consume the contracts from isolated owner fixtures and the authorized operational summary, checking zero, incomplete, cancelled, transferred-member and corrected records, incompatible definition versions and revoked scopes, proving visitor totals mean attendances rather than unique people and every ungranted or broad metadata response excludes private contacts, named absence lists and report-care text."
+covers = ["CAP-8"]
+after = [2, 4, 7, 10, "5.8"]
+hitl = false
+risk = "high"
+plan_checkpoint = true
+unknown = "Q8 must approve denominator, completeness and comparison definitions before production percentages or trends, while Q4 governs reference readership; the report snapshot/current-register relationship must be explicit, and downstream recap, visit and service implementations remain in their own epics."
+external_check = "An independent contract and privacy review checks both-client fixtures, mathematical coverage cases, caller authorization and the absence of report or contact content in exported owner references."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#service-attendance-and-pastoral-overview", "docs/runbooks/contracts-and-owner-seams.md#cells-meeting-reference-story-58", "_bmad-output/initiative-church-app/epic-safe-cell-recaps/epic-safe-cell-recaps.md", "_bmad-output/initiative-church-app/epic-pastoral-visits/epic-pastoral-visits.md", "_bmad-output/initiative-church-app/epic-service-counts-and-trends/epic-service-counts-and-trends.md"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Rehearse the cell register, visitor and private-report owner pilot"
+description = "Deliver CAP-8's operational acceptance preparation with source-backed visitor consent, attendance correction, report review, missed-report, withdrawal, handover and deletion runbooks, coherent fictional fixtures and an owner-led staff/mobile walkthrough of the whole ministry workflow, keeping missing functionality, unverified device behavior and unapproved policy decisions separate."
+verify = "The owner and named eligible pilot roles complete the recorded normal-navigation scenarios with permissions, denied access, offline/failed writes, retry and recovery, return screenshots or recordings and expected-versus-actual outcomes, and explicitly review applicable Q4/Q6/Q8 decisions without any automated acceptance completion or deployment."
+covers = ["CAP-8"]
+after = [3, 5, 6, 8, 9, 10, 11]
+hitl = true
+risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
+unknown = "The owner must name the pilot participants, approve any contact or notification activity and provide supported devices; no real visitor or pastoral data is entered before the relevant policy and environment approval."
+external_check = "An independent reviewer checks the acceptance matrix against every Epic 7 Done when and observes or reviews the evidence of the complete owner pilot, including negative and recovery paths."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md"]
+
+[[entry]]
+id = 13
+type = "story"
+title = "Refactor the completed cell attendance and report workflows"
+description = "Consolidate maintainability and boundary findings from all prior CAP-8 stories and the owner pilot without changing agreed behavior, erasing acceptance gaps or absorbing deferred feature scope, preserving the approved design primitives, shared command contracts and all permission and lifecycle guarantees."
+verify = "Review the targeted cleanup diff and rerun the affected permission, contract, cross-client and recovery regressions, confirming the same normal attendance, visitor, report and task outcomes and leaving any unresolved feature or owner evidence clearly open."
+covers = ["CAP-8"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+hitl = false
+risk = "medium"
+unknown = "The scope is limited to findings recorded during the completed work; new behavior or policy changes require a reviewed scope decision rather than being hidden in cleanup."
+references = ["_bmad-output/initiative-church-app/spec-church-app/design-contract.md", "docs/runbooks/contracts-and-owner-seams.md"]
+
+[[entry]]
+id = 14
+type = "story"
+title = "Verify Epic 7 end to end and prepare owner-controlled promotion"
+description = "Verify CAP-8's complete staff/mobile experience, backend permissions, corrections, real concurrency, reminder cancellation and lifecycle recovery on the exact candidate head, assemble the immutable release and rollback/recovery evidence, and promote only after the owner explicitly approves the release and all affected operational gates and prerequisite migration state are verified."
+verify = "Run every supported local and hosted check with command, commit, environment, date and evidence, complete the owner device matrix and independent permission review, inspect actual prerequisite migration history and isolated restore results, then record any explicit owner promotion and post-deployment evidence separately from engineering build status while leaving incomplete or unverified work open."
+covers = ["CAP-8"]
+after = [12, 13, "5.12"]
+hitl = true
+risk = "high"
+plan_checkpoint = true
+done_checkpoint = true
+unknown = "This proposal authorizes no deployment, merge, notification send or policy approval; the production candidate must additionally verify all preceding merged migrations including Epic 6, without treating that operational migration-order check as a whole-Epic-6 feature dependency."
+external_check = "A reviewer independent of implementation verifies the exact-head evidence and permission/lifecycle matrix, and the owner explicitly approves any production release and acceptance conclusion."
+references = ["docs/runbooks/environments-and-promotion.md", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md", "_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/tickets.toml", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md"]

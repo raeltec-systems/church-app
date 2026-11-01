@@ -1,0 +1,171 @@
+command: flutter test --reporter expanded --concurrency=2
+cwd: ../mobile-validation/apps/mobile
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:50:52.765855+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  _flutterfire_internals 1.3.77 (1.3.79 available)
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  code_assets 1.2.1 (2.1.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_ui 1.1.1 (1.1.5 available)
+  firebase_core 4.15.0 (5.1.0 available)
+  firebase_core_web 3.12.0 (4.1.0 available)
+  firebase_messaging 16.7.0 (17.0.1 available)
+  firebase_messaging_platform_interface 4.10.0 (4.11.1 available)
+  firebase_messaging_web 4.2.5 (4.3.1 available)
+  flutter_secure_storage 10.0.0 (11.2.0 available)
+  flutter_secure_storage_darwin 0.2.0 (0.4.3 available)
+  go_router 18.0.2 (18.1.2 available)
+  gotrue 2.27.2 (2.27.3 available)
+  hooks 2.0.2 (2.2.0 available)
+  jni 1.1.0 (1.1.1 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.5.0 (1.9.0 available)
+  meta 1.18.3 (1.19.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  petitparser 7.0.2 (7.1.0 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  record_use 0.6.0 (1.1.1 available)
+  share_plus 13.3.0 (13.3.1 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+37 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart
+00:00 +0: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: defines and adapter selection no defines: the no-op adapter, Firebase never started
+00:00 +1: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: defines and adapter selection a missing Android value keeps push off
+00:00 +2: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: defines and adapter selection Android defines map onto FirebaseOptions
+00:00 +3: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: defines and adapter selection iOS needs its own app id; web never gets push
+00:00 +4: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: defines and adapter selection defines present: Firebase starts with them on that platform
+00:00 +5: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: defines and adapter selection a Firebase that fails to start falls back to no push
+00:00 +6: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: taps data.item_id opens that inbox item; anything else is ignored
+00:00 +7: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: taps opened-app taps stream only valid item ids
+00:00 +8: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: taps the launch tap answers once
+00:00 +9: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: permission, token and foreground permission, request, token and delete
+00:00 +10: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: permission, token and foreground status mapping
+00:00 +11: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: permission, token and foreground a foreground message is only a content-free nudge
+00:00 +12: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/firebase_push_test.dart: permission, token and foreground nudges are merged into the inbox refresh signal
+00:00 +13: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/url_contact_launcher_test.dart: tel: and sms: links for an E.164 number
+00:00 +14: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/url_contact_launcher_test.dart: anything else is never handed over; a refusal or error says so
+00:00 +15: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/url_contact_launcher_test.dart: Android giving handoff sends only a valid USSD tel link externally
+00:00 +16: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/url_contact_launcher_test.dart: unsupported platforms and invalid or failed dialler links stay manual
+00:01 +17: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.9: guest opens sermons from the fifth-tab shell and detail has its own back bar
+00:01 +18: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.9: guest opens sermons from the fifth-tab shell and detail has its own back bar
+00:02 +19: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.9: guest opens sermons from the fifth-tab shell and detail has its own back bar
+00:02 +20: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 3.8: the staff reminder-health route does not exist on mobile
+00:02 +21: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 3.6: a tapped notification opens its inbox item; denied push registers nothing
+00:03 +22: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.9: I need help accessing my account, then a private password
+00:03 +23: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.8: a held session reaches only the generic help screen
+00:04 +24: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.8: sign-in details from the account page; a new username goes to church review, never by SMS
+00:04 +25: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.7: the recovery deep link opens a set-password form only, and the Android manifest accepts only the app scheme under /auth/
+00:04 +26: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.5: the applicant sees the church decision, separately from the cell, and no staff review data
+00:05 +27: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: tracer read shows in the shell; bottom tabs are named
+00:05 +28: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.1: a signed-out phone opens the Calendar and reads a two-day event with both endpoints
+00:05 +29: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.13: a signed-out phone opens a pinned announcement from Home, then the whole list
+00:05 +30: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.6: signed-out readers open cleared chapters and navigate by availability
+00:06 +31: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.7: a signed-out phone reads and searches the built-in Tonga hymn book
+00:06 +32: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.8: a signed-out phone is asked to sign in to save a hymn, and nothing is sent
+00:06 +33: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.3: a signed-out phone has Home, Bible & Hymns, Give and Calendar, opens How to give and copies a method's values
+00:07 +34: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.3: 2x text, Size(390.0, 844.0) ThemeMode.light: a bank method has no overflow
+00:07 +35: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.3: 2x text, Size(360.0, 640.0) ThemeMode.dark: a bank method has no overflow
+00:07 +36: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.1: a Pending applicant gets the same tabs and a Home without member cards
+00:07 +37: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: entry 14: a signed-out phone searches from the top bar: a hymn on the phone and an announcement from the server, with its own back bar
+00:07 +38: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: Account opens over Home with a back arrow and the member's places
+00:08 +39: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: the launch screen pulses while loading, then fades into the app
+00:08 +40: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: the launch screen pulses while loading, then fades into the app
+00:08 +41: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/share_calendar_export_test.dart: a closed sheet, an unknown answer and a failure say so
+00:08 +42: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.2: a signed-out phone opens Home on the banners, theme first, and a tap opens the original
+00:08 +43: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 6.2: a signed-out phone opens Home on the banners, theme first, and a tap opens the original
+00:08 +44: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: a member gets the same Home, Bible & Hymns, Give and Calendar tabs
+00:08 +45: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:08 +46: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:08 +47: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:08 +48: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:08 +49: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:09 +50: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:09 +51: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:09 +52: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:09 +53: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/offline/public_content_cache_adapter_test.dart: failed sermon commit preserves the prior catalog and image bytes
+00:09 +54: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +55: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +56: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +57: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +58: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +59: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +60: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +61: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +62: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +63: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +64: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +65: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +66: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +67: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.6: My cell follows member access and shows the confirmed cell separately from church membership
+00:09 +68: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/offline/public_content_cache_adapter_test.dart: banner snapshots keep eligible bytes and evict withdrawn revisions
+00:09 +69: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +70: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +71: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +72: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +73: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +74: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +75: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +76: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +77: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +78: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +79: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +80: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +81: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +82: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +83: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.1: Duties follows member access; the member accepts a duty and it shows Accepted only after the server confirms
+00:09 +84: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.5: Home follows member access and shows the My duties card
+00:09 +85: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.6: Home shows My follow-ups for an ordinary owner with open work and opens the task
+00:10 +86: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/offline/public_content_ordering_test.dart: F3: an old catalog read cannot bring back a withdrawn sermon through the blocked queue
+00:10 +87: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.7: a tapped follow-up reminder opens its item, then the task
+00:10 +88: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/offline/public_content_ordering_test.dart: F3: an old Calendar read cannot bring back a withdrawn event through the blocked queue
+00:10 +89: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.8: a duty answer reminder opens the duty, marked Short notice
+00:10 +90: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.8: a duty answer reminder opens the duty, marked Short notice
+00:10 +91: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.8: a duty answer reminder opens the duty, marked Short notice
+00:10 +92: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 4.8: a duty answer reminder opens the duty, marked Short notice
+00:10 +93: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.11: a member deletes their account from the account page; the device is signed out
+00:11 +94: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.10: a deactivated membership is shown as not active (no request link)
+00:11 +95: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.10: a login hold reaches only the generic help screen (never a reason), and not the deactivated state
+00:11 +96: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.2: refresh and resume keep the session; a session the server no longer trusts is ended and its state cleared
+00:11 +97: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.4: Create account -> membership request -> separate church and cell status; still no member access
+00:12 +98: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: unconfigured build explains itself and does not send commands
+00:12 +99: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: synthetic read/write fixture: create, change, conflict kept
+00:12 +100: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 2.3: an already signed-in session shows a role granted and then revoked elsewhere at its next request, without signing in again
+00:12 +101: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: an account switch drops the protected state
+00:12 +102: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: leaving and returning keeps this account's in-memory state (AD-13 clears it on account change, not on navigation)
+00:12 +103: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: a PointerDeviceKind.touch tap on a tab leaves no focus ring behind
+00:13 +104: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: a PointerDeviceKind.mouse tap on a tab leaves no focus ring behind
+00:13 +105: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: keyboard: page actions, then the tabs; Enter navigates
+00:13 +106: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: 2x text, Size(390.0, 844.0) ThemeMode.light: every tab, no overflow
+00:13 +107: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: 2x text, Size(360.0, 640.0) ThemeMode.dark: every tab, no overflow
+00:14 +108: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: the bottom safe area is applied once, by the tab bar
+00:14 +109: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: with the keyboard open, the focused sign-in field stays visible
+00:14 +110: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: only the composition root reaches Supabase; no client persistence
+00:14 +111: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: the app guard catches a shell that reaches the adapters
+00:14 +112: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 3.1: a member opens the Inbox and sees the server's item; signing out drops it
+00:14 +113: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 3.7: from the Inbox tab a member opens, snoozes and follows an item, and turns push off in notification settings
+00:15 +114: /workspace/scratch/308c700530ee/mobile-validation/apps/mobile/test/mobile_app_test.dart: story 3.7: the Fixture screen leads to the test reminders
+00:16 +115: All tests passed!
+
+finished_utc: 2026-10-30T19:51:29.769232+00:00
+exit_code: 0

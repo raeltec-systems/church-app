@@ -1,5 +1,7 @@
 # Whole public content and giving epic plan; entries remain planned until a build writes its plan.
 # Table order is build order; ids are stable. Requirement ids K1–K17 live in the epic's Requirements.
+# Reconciled 2026-10-30: owner allowed 6.16 before the 6.15 pilot; 6.17 still requires both.
+# Built plans are implementation evidence, not owner acceptance or production completion.
 # Off production all content is SYNTHETIC or public domain and every giving method is a labelled SAMPLE
 # (owner-decisions-milestone-1.md); Q3 and Q5 gate production publication until Israel approves them.
 
@@ -13,7 +15,7 @@ covers = ["K1", "K5", "K12", "K17"]
 after = ["1.7", "2.11"]
 hitl = false
 risk = "high"
-unknown = "Whether public reads use `security_invoker` views with an anonymous policy (the 1.1 `platform_status` pattern) or audited read functions is decided at build within AD-2; moving Duties and My cell off the tab bar is an agent assumption in the epic Notes that Israel may reverse."
+unknown = "Resolved at build: public reads use the audited function contract; the five mobile tabs were owner-confirmed on 2026-10-21. Normal-app role and failure/recovery evidence remains part of entries 15 and 17."
 references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-2--one-transactional-command-and-read-contract-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-15--public-giving-and-optional-chat-stay-isolated-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#roles-and-permissions", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-14-calendar.png", "docs/runbooks/contracts-and-owner-seams.md", "docs/runbooks/client-shells.md"]
 external_check = "An independent reviewer repeats the anonymous, Pending and plain-member read and command matrix (drafts, withdrawn items, editor identity, direct table access) before entry 17."
 
@@ -27,7 +29,7 @@ covers = ["K2", "K3", "K6"]
 after = [1]
 hitl = false
 risk = "high"
-unknown = "AD-2 adds no custom objects to the storage schema, so upload and the copy into the public bucket run through an authenticated route (an Edge function under the editor's live session) or, if the build shows that cannot work, a purpose-bound system credential (AD-19) that Israel mints, which would add a hitl step here."
+unknown = "The built content-assets Edge route checks the editor session and uses server Storage authority. Private-upload retention has its own bounded system principal. The 30 October connected read confirms content-assets ACTIVE v4 metadata; deployed source-byte parity and actual Storage behavior still require release evidence; preserve the owner-accepted public take-back residual."
 references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-19--bounded-system-principals-assumption", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#assets", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#decision-register", "docs/design-handoff/screenshots/app-01-home-member.png", "docs/runbooks/backup-and-restore.md"]
 external_check = "An independent reviewer tries to read draft, uncleared and withdrawn files and to upload a disallowed type before entry 17."
 
@@ -41,7 +43,7 @@ covers = ["K15", "K16", "K1"]
 after = [1]
 hitl = false
 risk = "high"
-unknown = "The real methods, destinations, purposes, currency, publishing Admins and support contact are Q3; whether a second person must verify each destination change is an open question for Israel in the epic Notes."
+unknown = "The real methods, destinations, purposes, currency, publishing Admins and support contact remain Q3. The different-Admin rule was owner-approved on 2026-10-21 and the verifier's 14-elapsed-day tenure requirement on 2026-10-22; both are built."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#giving-instructions", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#core-data-model", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-15--public-giving-and-optional-chat-stay-isolated-adopted", "docs/design-handoff/screenshots/app-12-give.png", "docs/design-handoff/screenshots/app-13-give-instructions.png"]
 external_check = "An independent reviewer repeats the giving permission, re-verification and payer-field refusal cases before entry 17, and Israel verifies every real destination before production publication."
 
@@ -55,7 +57,7 @@ covers = ["K4"]
 after = [2]
 hitl = false
 risk = "medium"
-unknown = "The storage format and package (files under path_provider or an embedded database) are chosen and pinned at build; staff web keeps no persistent cache; whether a display-only item may sit in a short-lived cache is a Q5 question in the epic Notes, and until answered it is shown online only."
+unknown = "The built mobile file cache uses path_provider and rights/publication revisions; staff web keeps no persistent cache. Display-only material stays online only. Physical relaunch/reconnect checks remain in entry 15."
 references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-16--shared-client-contract-and-accessible-surfaces-assumption", "packages/client_core/test/boundaries_test.dart"]
 
 [[entry]]
@@ -89,12 +91,12 @@ id = 7
 type = "story"
 title = "Search and read the church's Tonga hymn book, built into the app"
 description = "Ship the official Brethren in Christ Church Tonga hymn book inside both apps from one checked-in source file in a shared package (hymn number, title, optional key, ordered verses, chorus, first line taken from verse 1), produced from Israel's manuscript by a repo converter that reports gaps, repeated numbers, empty verses and unreadable lines, with no database rows, rights record, staff import, editing or publication for hymn text (owner decision 2026-10-27); and add the Hymn book segment of the entry 6 Bible & Hymns tab with list rows (large number, title, first line), on-device search by number, title and first line that ignores case, punctuation and apostrophes, and the detail (number in the header, title, key, numbered verses, italic chorus in 19/1.55 text), all working offline and without sign-in."
-verify = "On a signed-out Android phone with no connection, find hymns by number, by title words and by first-line words and open one with its key and chorus; the converter refuses a test manuscript with a gap, a repeated number and an empty verse; and the hymn count in the app matches the converted book (until Israel's manuscript arrives, a clearly labelled sample book)."
+verify = "On a signed-out Android phone with no connection, find hymns by number, by title words and by first-line words and open one with its key and chorus; the converter refuses a test manuscript with a gap, a repeated number and an empty verse; and the hymn count in the app matches the converted book (the supplied official book has 199 hymns and 67 choruses)."
 covers = ["K8", "K5"]
 after = [6]
 hitl = false
 risk = "low"
-unknown = "The manuscript's file format is unknown until Israel supplies it, so the converter is finished against the real file; until then the app carries a small, clearly labelled sample book. Hymn audio arrives in entry 10."
+unknown = "The supplied manuscript was converted and the official book ships in both apps. Physical offline acceptance and the printed stanza checks for hymns 25, 29 and 30 remain open; hymn audio was descoped by the owner on 2026-10-27."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#bible-and-hymn-book", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-10-hymn-book.png"]
 
 [[entry]]
@@ -107,7 +109,7 @@ covers = ["K9", "K6", "K17"]
 after = [7]
 hitl = false
 risk = "high"
-unknown = "Who keeps the Sunday list (Media only, or also a worship leader) is Q5 and the scope kind is an agent assumption Israel may drop; Israel applies the `_rows` file on staging by hand right after this entry's staging deploy, as for 4.1, because until then the fail-closed stub stalls every staging member deletion at its erase step, including the 4.15 and 5.12 deletion reruns."
+unknown = "Admin, Media and an appointed worship leader can set Sunday hymns under the recorded owner decision. The 30 October connected read confirms the matching favourites purge body on staging, but version 20261027182300 is absent from migration history. Separately review/authorize any history remediation and deletion rehearsal; do not replay or repair automatically."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#bible-and-hymn-book", "docs/runbooks/identity-access.md", "docs/runbooks/contracts-and-owner-seams.md", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md"]
 external_check = "The entry 17 suite reruns the favourites privacy and deletion cases on staging after the `_rows` file is applied."
 
@@ -121,7 +123,7 @@ covers = ["K10", "K5", "K4"]
 after = [4]
 hitl = false
 risk = "medium"
-unknown = "The YouTube embed package and its privacy-enhanced mode are chosen and pinned at build; the church's channel and sermon media rights are Q5."
+unknown = "The YouTube embed package is pinned with privacy-enhanced mode. Actual channel/media rights remain Q5, and physical playback/unavailable-video recovery remains in entry 15."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#deferred", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-11-sermons.png"]
 
 [[entry]]
@@ -134,7 +136,7 @@ covers = ["K10", "K5"]
 after = [9]
 hitl = false
 risk = "medium"
-unknown = "Facebook's embedded player works only for public videos and may change its embed rules; the web view package is chosen and pinned at build. iOS playback waits for Israel's device in entry 15."
+unknown = "Facebook's embedded player works only for public videos and may change its embed rules; webview_flutter is pinned. Actual Android/iOS playback and unavailable-video recovery require entry 15 device evidence."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations"]
 
 [[entry]]
@@ -147,7 +149,7 @@ covers = ["K12", "K3", "K17"]
 after = [4, "4.5"]
 hitl = false
 risk = "high"
-unknown = "Whether organisers should see who is coming is a Q4 personal-data question for Israel, so this entry shows counts only; Israel applies the `_rows` file on staging by hand right after this entry's staging deploy, as for 4.1, because until then the fail-closed stub stalls every staging member deletion at its erase step."
+unknown = "The owner approved organiser/Admin access to RSVP names on 2026-10-21; others see counts only. The 30 October connected read confirms the matching RSVP purge body on staging, but version 20261027140200 is absent from migration history. Separately review/authorize any history remediation and deletion rehearsal; do not replay or repair automatically. Organisers without an event-editor role remain an owner scope question."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#events-and-announcements", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#membership-and-account-lifecycle", "packages/client_core/lib/src/domain/duty_calendar.dart", "docs/runbooks/identity-access.md"]
 external_check = "An independent reviewer repeats the capacity race and the deactivation release before entry 17, and the entry 17 suite reruns the RSVP deletion case on staging after the `_rows` file is applied."
 
@@ -161,7 +163,7 @@ covers = ["K12", "K5"]
 after = [11, "5.1"]
 hitl = false
 risk = "medium"
-unknown = "Epic 7 may change Cells at the same time, so the new read is its own function and touches no existing Cells read; the visible period is bounded (a month view) and chosen at build."
+unknown = "The delivered Cells read is separate from cells_my_cell and exposes the signed-in member's own confirmed-cell meetings over a fixed 31-day window. Epic 7 must preserve that contract; integrated permission/offline checks remain in entries 15 and 17."
 references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#navigation-and-visual-style", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-14-calendar.png", "docs/runbooks/cells-meetings.md"]
 
 [[entry]]
@@ -174,7 +176,7 @@ covers = ["K13"]
 after = [11, "4.16"]
 hitl = false
 risk = "high"
-unknown = "If Duties needs a contract change to validate `event_ref` through `contract_check_source`, it is recorded in the 4.11 consumer guide as epic 5 did, not worked around in Content."
+unknown = "The built Duties contract validates changed event_ref values through contract_check_source; the 4.11 consumer guide records the change. Integrated leader-notice and unchanged duty-response evidence remains in entry 17."
 references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#events-and-announcements", "docs/runbooks/contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md"]
 external_check = "An independent reviewer repeats the event-change flag, notice and rota non-exposure cases before entry 17."
 
@@ -214,21 +216,8 @@ covers = ["K6", "K5"]
 after = [8, 9, 11, 13]
 hitl = false
 risk = "medium"
-unknown = "The search read's ranking and page size are chosen at build within the bounded-collection convention; Bible text is not searched (assumption in the epic Notes)."
+unknown = "The built anonymous search is bounded to 10 matches per kind with truncation and all-word matching; hymn search is on-device. Bible text is not searched. The signed-out normal-app walkthrough remains in entry 15."
 references = ["_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#navigation-and-visual-style", "docs/design-handoff/screenshots/app-18-home-guest.png", "docs/design-handoff/screenshots/app-01-home-member.png"]
-
-[[entry]]
-id = 15
-type = "story"
-title = "Write the media and giving runbooks and run the synthetic content pilot"
-description = "Write the media runbook (publishing, rights records and Q5 evidence, imports, broken-link and unavailable-media checks, withdrawal, Sunday hymns, sermon drafts from duties) and the giving runbook (destination verification, change and re-verification, hide, archive, the unsafe flag, support questions and the no-payment-claim rule), then run the content and giving pilot on staging with SYNTHETIC and public-domain content, SAMPLE giving methods and chat absent, with Israel checking the dialler handoff, background audio and announcement push on his Android and iOS devices."
-verify = "Israel follows the runbooks on staging and confirms that a guest can read, play and follow giving instructions without signing in, a withdrawn item and a hidden method disappear after refresh, an unavailable video keeps its notes, the dialler handoff, background audio and an announcement push behave on his phones, and nothing depends on chat."
-covers = ["K17"]
-after = [5, 14, 18, 19]
-hitl = true
-risk = "medium"
-unknown = "Real content, rights evidence and verified destinations are Q3 and Q5; this entry is the synthetic rehearsal."
-references = ["_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#external-lead-times-and-operating-constraints", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#administration-and-safeguards"]
 
 [[entry]]
 id = 16
@@ -237,22 +226,35 @@ title = "Refactor sweep"
 description = "Clean up content, giving and client duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
 verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected permission, public-read, file, cache, giving and client checks without weakening contracts or acceptance behavior."
 covers = ["K17"]
-after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 19, 12, 18, 13, 14, 15]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 19, 12, 18, 13, 14]
 hitl = false
 risk = "medium"
-unknown = "The cleanup scope is chosen from build records when this story starts; any missing behavior becomes its own entry."
+unknown = "The built sweep is recorded in its plan. The owner allowed it before entry 15; its completion does not waive the pilot. Any newly established missing behavior needs its own investigated work."
 references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 15
+type = "story"
+title = "Write the media and giving runbooks and run the synthetic content pilot"
+description = "Write the media runbook (publishing, rights records and Q5 evidence, imports, broken-link and unavailable-media checks, withdrawal, Sunday hymns, sermon drafts from duties) and the giving runbook (destination verification, change and re-verification, hide, archive, the unsafe flag, support questions and the no-payment-claim rule), then run the content and giving pilot on staging with SYNTHETIC and public-domain content, SAMPLE giving methods and chat absent, with Israel checking the dialler/manual fallback, YouTube/Facebook playback and explicitly authorized announcement push on his Android and iOS devices."
+verify = "Israel follows the runbooks on staging and confirms that a guest can read, play and follow giving instructions without signing in, a withdrawn item and a hidden method disappear after refresh, an unavailable video keeps its notes, the dialler/manual fallback, YouTube/Facebook playback and an explicitly authorized announcement push behave on his phones, and nothing depends on chat."
+covers = ["K17"]
+after = [5, 14, 18, 19, 16]
+hitl = true
+risk = "medium"
+unknown = "Real content, rights evidence and verified destinations are Q3 and Q5; this entry is the synthetic rehearsal."
+references = ["_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#external-lead-times-and-operating-constraints", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#administration-and-safeguards"]
 
 [[entry]]
 id = 17
 type = "story"
 title = "Verify public content and giving end to end and promote them to production"
-description = "Run the closing mobile and staff web suite over publication, rights, files, cache, Bible, hymns, favourites, the Sunday list, sermons and audio, sermon drafts, events, RSVP, Calendar overlays, duty links, announcements and giving with the Guest, Pending, Member, Media, Pastor, Admin and combined-role matrix, unsafe input, media failures, deletion and handoff and return cases and chat absent on staging, then promote to the production baseline with Q3 destinations and Q5 rights either approved by Israel or left fail-closed."
+description = "Run the closing mobile and staff web suite over publication, rights, files, cache, Bible, hymns, favourites, the Sunday list, sermons with YouTube/Facebook video, sermon drafts, events, RSVP, Calendar overlays, duty links, announcements and giving with the Guest, Pending, Member, Media, Pastor, Admin and combined-role matrix, unsafe input, media failures, deletion and handoff and return cases and chat absent on staging, then promote to the production baseline with Q3 destinations and Q5 rights either approved by Israel or left fail-closed."
 verify = "A clean build of both clients passes the integrated content and giving scenarios (AC-07, AC-14 and the CAP-1 and CAP-2 edge cases) and the independent reviewers' reruns on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with publication of unapproved giving methods and third-party material visibly refused."
 covers = ["K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K12", "K13", "K14", "K15", "K16", "K17"]
-after = [16, "5.12"]
+after = [15, 16, "5.12"]
 hitl = true
 risk = "high"
-unknown = "Production needs duties and cell programmes in production first (5.12, after 4.15), Israel's Q3 and Q5 approvals and the store-review caution on giving instructions; while any is missing this entry delivers staging evidence and stays open."
+unknown = "Production requires prior Duties/Cells promotion (5.12 after 4.15), witnessed entry 15/17 evidence, an explicit owner promotion decision and Q3/Q5 approved for their uses or visibly fail-closed. The two-version staging migration-history blocker was verified closed on 31 October 2026 (acceptance-update-2026-10-31.md); broader deployed parity, remaining unverified checks and the giving store-review caution stay visible; this entry remains open until its evidence and approval are recorded."
 references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#launch-checks", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries", "docs/runbooks/environments-and-promotion.md", "docs/runbooks/production-promotion-cells.md"]
 external_check = "An independent reviewer reruns the public-read, file, giving and duty-link cases before promotion, and Israel approves the `q3_giving` and `q5_content_rights` values."

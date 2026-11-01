@@ -1,0 +1,43 @@
+command: flutter test --reporter expanded
+cwd: packages/design_system
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:39:04.205433+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  material_color_utilities 0.13.0 (0.13.1 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.3 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+Got dependencies!
+4 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart
+00:00 +0: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens light text pairs meet 4.5:1
+00:00 +1: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens light focus ring is >=3:1 against bg and surface
+00:00 +2: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens dark text pairs meet 4.5:1
+00:00 +3: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens dark focus ring is >=3:1 against bg and surface
+00:00 +4: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens staff chrome (light only) meets contrast on navy
+00:00 +5: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens design-contract values are carried verbatim
+00:00 +6: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: tokens themes expose the tokens; staff is light only
+00:00 +7: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: FocusRing shows a ring only while its control has focus
+00:00 +8: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +9: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +10: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +11: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:01 +12: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: RadioSegments exposes a named radio group with checked state
+00:01 +13: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: RadioSegments exposes a named radio group with checked state
+00:01 +14: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: a table header is grey sentence case; numbers end right
+00:01 +15: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: NavItem is a selectable tab with a 44px target
+00:01 +16: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: a progress bar has no stub at zero
+00:01 +17: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/design_system_test.dart: banner and status label survive 2x text without overflow
+00:01 +18: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: confirmation names the action and waits for an answer
+00:01 +19: /workspace/scratch/308c700530ee/church-app/packages/design_system/test/staff_components_test.dart: confirmation names the action and waits for an answer
+00:01 +20: All tests passed!
+
+finished_utc: 2026-10-30T19:39:16.359921+00:00
+exit_code: 0

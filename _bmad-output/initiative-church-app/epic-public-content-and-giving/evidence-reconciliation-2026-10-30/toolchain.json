@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-30",
+  "host": "Linux x86_64, transient task workspace",
+  "node": {
+    "host_version": "24.22.1",
+    "validation_version": "22.23.4",
+    "source": "https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-x64.tar.xz",
+    "manifest": "https://nodejs.org/dist/index.json"
+  },
+  "supabase": {
+    "version": "2.119.0",
+    "install": "npm ci (package-lock.json)",
+    "install_exit_code": 0,
+    "version_evidence": "logs/supabase-version-retry.log"
+  },
+  "flutter": {
+    "version": "3.47.6",
+    "tag_commit": "5fc346839b5d0eef006ed8404392afb4dfae428d",
+    "source": "https://github.com/flutter/flutter.git",
+    "dart": "3.13.5",
+    "engine_revision": "692136cb6582dbfc5af3fb33c2515a069f2f66d0",
+    "version_evidence": "logs/flutter-version-retry.log",
+    "archive_recovery": "Public manifest and complete SDK archive returned HTTP 404; official tag cloned. Slow Dart archive was downloaded using parallel HTTP byte ranges over the existing TLS/proxy path, verified against server size and published MD5, then standard Flutter bootstrap resumed. No SDK source modification.",
+    "dart_archive_bytes": 238721416,
+    "dart_archive_md5": "8ade8425a5a2f7f0b2810a61ecb46252",
+    "web_archive": {
+      "url": "https://storage.googleapis.com/flutter_infra_release/flutter/692136cb6582dbfc5af3fb33c2515a069f2f66d0/flutter-web-sdk.zip",
+      "bytes": 32388911,
+      "md5": "f6576949da5a9b06ba33ae6b7ac7de83",
+      "note": "Slow sequential transfer replaced by checksum-verified complete official archive, extracted into matching SDK cache, with matching cache-version stamp. Standard flutter precache then completed all remaining Linux/web artifacts; no SDK source or app changes."
+    }
+  },
+  "docker": {
+    "status": "unavailable",
+    "evidence": "logs/local-stack-detection.log",
+    "reason": "Neither Docker nor Podman is installed; neither standard Docker socket exists. No local stack or database was reset. Hosted main CI is separate historical evidence."
+  },
+  "permissions": "Supported execution escalation was used for dependency downloads, subprocess execution and tool caches after sandbox failures. No proxy/TLS changes and no hosted data operations.",
+  "staging": "No current migration parity asserted. No hosted API checks run by this validation agent. No notifications or deployment.",
+  "chromium": {
+    "version": "151.0.7922.34",
+    "source": "https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.34/linux64/chrome-headless-shell-linux64.zip",
+    "bytes": 120231126,
+    "md5": "792047b3c2625d7d4b0fc7c4fc67d7ad",
+    "note": "Playwright CDN returned HTML instead of ZIP. Matching official Google archive retrieved via existing proxy/TLS, verified against published size and MD5, extracted locally. Headless wrapper uses --no-sandbox in this isolated root test container."
+  },
+  "resource_recovery": {
+    "memory_limit_bytes": 8589934592,
+    "observed_oom_kill_counter": 1,
+    "scope": "Initial concurrent core tests and web builds; causality of the single kernel OOM is not independently established. Core test progress stopped without a final marker. Paused and terminated only validation-owned process trees; complete core suite rerun with concurrency=2; subsequent build scheduled sequentially. No product defect inferred from incomplete attempts."
+  }
+}

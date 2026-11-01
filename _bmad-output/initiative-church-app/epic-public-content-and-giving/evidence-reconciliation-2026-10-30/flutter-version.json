@@ -1,0 +1,12 @@
+{
+  "name": "flutter-version",
+  "command": "flutter --version",
+  "cwd": ".",
+  "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "started_utc": "2026-10-30T19:29:41.229627+00:00",
+  "finished_utc": "2026-10-30T19:31:21.176234+00:00",
+  "exit_code": 143,
+  "status": "run-failed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/flutter-version.log",
+  "interpretation": "Slow initial official SDK download was deliberately terminated (143) and replaced by a verified complete download; superseded by flutter-version-retry."
+}

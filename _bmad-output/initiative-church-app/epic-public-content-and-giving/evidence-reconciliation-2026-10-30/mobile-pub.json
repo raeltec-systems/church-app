@@ -1,0 +1,11 @@
+{
+  "name": "mobile-pub",
+  "command": "flutter pub get --enforce-lockfile",
+  "cwd": "../mobile-validation/apps/mobile",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:46:01.903747+00:00",
+  "finished_utc": "2026-10-30T19:46:13.496055+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/mobile-pub.log"
+}

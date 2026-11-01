@@ -1,0 +1,518 @@
+{
+  "entry_count": 14,
+  "entry_reference_count": 57,
+  "proposal_markdown_links": 18,
+  "references": [
+    {
+      "origin": "7.1",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "cell-groups",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.1",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true,
+      "anchor": "staff-screens-and-flows",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.1",
+      "reference": "supabase/migrations/20261028130727_cells_record_roster.sql",
+      "path": "/workspace/scratch/308c700530ee/church-app/supabase/migrations/20261028130727_cells_record_roster.sql",
+      "exists": true
+    },
+    {
+      "origin": "7.1",
+      "reference": "supabase/migrations/20261015190139_duties_owner_decisions.sql",
+      "path": "/workspace/scratch/308c700530ee/church-app/supabase/migrations/20261015190139_duties_owner_decisions.sql",
+      "exists": true
+    },
+    {
+      "origin": "7.1",
+      "reference": "docs/runbooks/identity-access.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/identity-access.md",
+      "exists": true
+    },
+    {
+      "origin": "7.1",
+      "reference": "docs/runbooks/contracts-and-owner-seams.md#cells-meeting-reference-story-58",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true,
+      "anchor": "cells-meeting-reference-story-58",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.2",
+      "reference": "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-12--recorded-observations-and-comparable-metrics-adopted",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md",
+      "exists": true,
+      "anchor": "ad-12--recorded-observations-and-comparable-metrics-adopted",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.2",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true,
+      "anchor": "state-fidelity-and-binding-prototype-overrides",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.2",
+      "reference": "packages/client_core/lib/src/application/cell_controllers.dart",
+      "path": "/workspace/scratch/308c700530ee/church-app/packages/client_core/lib/src/application/cell_controllers.dart",
+      "exists": true
+    },
+    {
+      "origin": "7.3",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#follow-up-tasks",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "follow-up-tasks",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.3",
+      "reference": "docs/runbooks/follow-ups.md#story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/follow-ups.md",
+      "exists": true,
+      "anchor": "story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.3",
+      "reference": "docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true,
+      "anchor": "direct-contact-routes-story-35",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.3",
+      "reference": "docs/runbooks/notifications.md#story-35-recipients-routed-by-current-access-work-retired-on-lifecycle-events",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/notifications.md",
+      "exists": true,
+      "anchor": "story-35-recipients-routed-by-current-access-work-retired-on-lifecycle-events",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.3",
+      "reference": "supabase/migrations/20261014130535_followups_reminders.sql",
+      "path": "/workspace/scratch/308c700530ee/church-app/supabase/migrations/20261014130535_followups_reminders.sql",
+      "exists": true
+    },
+    {
+      "origin": "7.3",
+      "reference": "packages/contracts/fixtures/v1/task_source.json",
+      "path": "/workspace/scratch/308c700530ee/church-app/packages/contracts/fixtures/v1/task_source.json",
+      "exists": true
+    },
+    {
+      "origin": "7.4",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "cell-groups",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.4",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md",
+      "exists": true
+    },
+    {
+      "origin": "7.4",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true,
+      "anchor": "staff-screens-and-flows",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.5",
+      "reference": "docs/runbooks/follow-ups.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/follow-ups.md",
+      "exists": true
+    },
+    {
+      "origin": "7.5",
+      "reference": "docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true,
+      "anchor": "direct-contact-routes-story-35",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.5",
+      "reference": "packages/contracts/fixtures/v1/task_source.json",
+      "path": "/workspace/scratch/308c700530ee/church-app/packages/contracts/fixtures/v1/task_source.json",
+      "exists": true
+    },
+    {
+      "origin": "7.5",
+      "reference": "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-7--one-accountable-follow-up-registry-adopted",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md",
+      "exists": true,
+      "anchor": "ad-7--one-accountable-follow-up-registry-adopted",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.6",
+      "reference": "docs/runbooks/identity-access.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/identity-access.md",
+      "exists": true
+    },
+    {
+      "origin": "7.6",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#joining-from-the-app",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "joining-from-the-app",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.6",
+      "reference": "_bmad-output/initiative-church-app/owner-decisions-milestone-1.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/owner-decisions-milestone-1.md",
+      "exists": true
+    },
+    {
+      "origin": "7.7",
+      "reference": "supabase/migrations/20261006234820_identity_grants.sql",
+      "path": "/workspace/scratch/308c700530ee/church-app/supabase/migrations/20261006234820_identity_grants.sql",
+      "exists": true
+    },
+    {
+      "origin": "7.7",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#roles-and-permissions",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "roles-and-permissions",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.7",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true,
+      "anchor": "staff-screens-and-flows",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.7",
+      "reference": "docs/design-handoff/screenshots/admin-07-meeting-report.png",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/design-handoff/screenshots/admin-07-meeting-report.png",
+      "exists": true
+    },
+    {
+      "origin": "7.8",
+      "reference": "docs/design-handoff/screenshots/admin-10-cell-reports.png",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/design-handoff/screenshots/admin-10-cell-reports.png",
+      "exists": true
+    },
+    {
+      "origin": "7.8",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true,
+      "anchor": "state-fidelity-and-binding-prototype-overrides",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.8",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "cell-groups",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.9",
+      "reference": "docs/runbooks/follow-ups.md#story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/follow-ups.md",
+      "exists": true,
+      "anchor": "story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.9",
+      "reference": "docs/runbooks/follow-ups.md#source-specific-schedules-source-owners-in-their-own-migration",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/follow-ups.md",
+      "exists": true,
+      "anchor": "source-specific-schedules-source-owners-in-their-own-migration",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.9",
+      "reference": "docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true,
+      "anchor": "direct-contact-routes-story-35",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.9",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#follow-up-tasks",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "follow-up-tasks",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.9",
+      "reference": "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/owner-decisions-milestone-2.md",
+      "exists": true
+    },
+    {
+      "origin": "7.9",
+      "reference": "packages/contracts/fixtures/v1/source_ref.json",
+      "path": "/workspace/scratch/308c700530ee/church-app/packages/contracts/fixtures/v1/source_ref.json",
+      "exists": true
+    },
+    {
+      "origin": "7.10",
+      "reference": "docs/runbooks/identity-access.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/identity-access.md",
+      "exists": true
+    },
+    {
+      "origin": "7.10",
+      "reference": "docs/runbooks/duties.md#decision-10-the-last-leaders-scope-cannot-be-revoked-first-cross-epic-identity-change",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/duties.md",
+      "exists": true,
+      "anchor": "decision-10-the-last-leaders-scope-cannot-be-revoked-first-cross-epic-identity-change",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.10",
+      "reference": "supabase/migrations/20261015190139_duties_owner_decisions.sql",
+      "path": "/workspace/scratch/308c700530ee/church-app/supabase/migrations/20261015190139_duties_owner_decisions.sql",
+      "exists": true
+    },
+    {
+      "origin": "7.10",
+      "reference": "docs/runbooks/follow-ups.md#story-412-lifecycle-and-handover-of-follow-up-tasks",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/follow-ups.md",
+      "exists": true,
+      "anchor": "story-412-lifecycle-and-handover-of-follow-up-tasks",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.10",
+      "reference": "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md",
+      "exists": true,
+      "anchor": "ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.11",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#service-attendance-and-pastoral-overview",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true,
+      "anchor": "service-attendance-and-pastoral-overview",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.11",
+      "reference": "docs/runbooks/contracts-and-owner-seams.md#cells-meeting-reference-story-58",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true,
+      "anchor": "cells-meeting-reference-story-58",
+      "anchor_exists": true
+    },
+    {
+      "origin": "7.11",
+      "reference": "_bmad-output/initiative-church-app/epic-safe-cell-recaps/epic-safe-cell-recaps.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-safe-cell-recaps/epic-safe-cell-recaps.md",
+      "exists": true
+    },
+    {
+      "origin": "7.11",
+      "reference": "_bmad-output/initiative-church-app/epic-pastoral-visits/epic-pastoral-visits.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-pastoral-visits/epic-pastoral-visits.md",
+      "exists": true
+    },
+    {
+      "origin": "7.11",
+      "reference": "_bmad-output/initiative-church-app/epic-service-counts-and-trends/epic-service-counts-and-trends.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-service-counts-and-trends/epic-service-counts-and-trends.md",
+      "exists": true
+    },
+    {
+      "origin": "7.12",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md",
+      "exists": true
+    },
+    {
+      "origin": "7.12",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true
+    },
+    {
+      "origin": "7.12",
+      "reference": "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/owner-decisions-milestone-2.md",
+      "exists": true
+    },
+    {
+      "origin": "7.13",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true
+    },
+    {
+      "origin": "7.13",
+      "reference": "docs/runbooks/contracts-and-owner-seams.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true
+    },
+    {
+      "origin": "7.14",
+      "reference": "docs/runbooks/environments-and-promotion.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/environments-and-promotion.md",
+      "exists": true
+    },
+    {
+      "origin": "7.14",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md",
+      "exists": true
+    },
+    {
+      "origin": "7.14",
+      "reference": "_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/tickets.toml",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/tickets.toml",
+      "exists": true
+    },
+    {
+      "origin": "7.14",
+      "reference": "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "epic-cell-attendance-and-private-reports.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-cell-attendance-and-private-reports/epic-cell-attendance-and-private-reports.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "tickets.proposed.toml",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-cell-attendance-and-private-reports/tickets.proposed.toml",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../initiative-church-app.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/initiative-church-app.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../tickets.toml",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/tickets.toml",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../spec-church-app/spec-church-app.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/spec-church-app.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../spec-church-app/functional-requirements.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../spec-church-app/design-contract.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/design-contract.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../spec-church-app/acceptance-map.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../spec-church-app/delivery-and-decisions.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../architecture-church-app/architecture-church-app.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../owner-decisions-milestone-1.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/owner-decisions-milestone-1.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../owner-decisions-milestone-2.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/owner-decisions-milestone-2.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../epic-cell-meetings-and-programmes/epic-cell-meetings-and-programmes.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/epic-cell-meetings-and-programmes.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../epic-cell-meetings-and-programmes/tickets.toml",
+      "path": "/workspace/scratch/308c700530ee/church-app/_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/tickets.toml",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../../../docs/runbooks/follow-ups.md#story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/follow-ups.md",
+      "exists": true,
+      "anchor": "story-47-remind-follow-up-owners-and-supervisors-on-the-task-schedule",
+      "anchor_exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../../../docs/runbooks/contracts-and-owner-seams.md#direct-contact-routes-story-35",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/contracts-and-owner-seams.md",
+      "exists": true,
+      "anchor": "direct-contact-routes-story-35",
+      "anchor_exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../../../docs/runbooks/identity-access.md",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/identity-access.md",
+      "exists": true
+    },
+    {
+      "origin": "inception-proposal-2026-10-30.md",
+      "reference": "../../../docs/runbooks/duties.md#decision-10-the-last-leaders-scope-cannot-be-revoked-first-cross-epic-identity-change",
+      "path": "/workspace/scratch/308c700530ee/church-app/docs/runbooks/duties.md",
+      "exists": true,
+      "anchor": "decision-10-the-last-leaders-scope-cannot-be-revoked-first-cross-epic-identity-change",
+      "anchor_exists": true
+    }
+  ],
+  "issues": []
+}

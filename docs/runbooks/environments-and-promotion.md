@@ -107,9 +107,10 @@ Start it from Actions, then **promote**, then **Run workflow** with target `stag
    - A database that carries a different marker stops the run.
    - `tools/ci/verify-hosted.sql` then asserts the marker, a closed `private_access` gate and the disabled baseline. In production each notification activation assertion applies only while its gate is unapproved: no scheduler job unless `ops_system_access`, `q2_church_time` and `q12_operations` are approved; `outbound_sending` closed unless its approval value names production (`{"environment": "production"}`); `push_enabled` false unless that production approval exists. Staging may keep its synthetic scheduler running and `outbound_sending` open (owner decision 2026-10-13).
 6. Edge Functions:
-   - The pinned Supabase CLI deploys `identity-assisted-recovery`, `identity-deletion` and
-     `notifications-worker` to the same guarded project ref, each with `--no-verify-jwt` as
-     declared in `supabase/config.toml`.
+   - The pinned Supabase CLI deploys `identity-assisted-recovery`, `identity-deletion`,
+     `notifications-worker` and `content-assets` to the same guarded project ref, each with
+     `--no-verify-jwt` as declared in `supabase/config.toml`. The policy regression compares
+     this deployment inventory with every explicitly enabled function in that configuration.
    - This runs after migration sync and hosted verification, and before any client build. A failed
      deployment stops promotion.
    - The function secrets remain owner-managed in each Supabase project's Edge Function secrets;
@@ -142,7 +143,10 @@ For production, all of the following must hold:
 
 Command versions stay backwards compatible (AD-17 expand/contract). Old command versions are retained until supported clients migrate, so a backend promoted first never breaks clients already deployed. Rollback is forward repair: add a new migration. There is no destructive down-migration.
 
-The promotion workflow deploys the three configured Edge Functions after hosted verification.
+The promotion workflow deploys all four configured Edge Functions after hosted verification.
+Content's asset and private-upload retention runtime requirements are recorded in
+[production-promotion-content.md](production-promotion-content.md); deploying the function does
+not establish that its owner-managed credentials or scheduler delivery have been verified.
 Production hosted verification also requires the notification scheduler and push switch to be off
 and `outbound_sending` closed while their gates are unapproved (see `notifications.md`, Story 3.10,
 Production gate), and alerting disabled. Staging may run its synthetic acceptance scheduler and

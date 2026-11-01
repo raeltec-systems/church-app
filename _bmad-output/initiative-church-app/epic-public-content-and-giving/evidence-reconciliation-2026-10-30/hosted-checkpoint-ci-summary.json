@@ -1,0 +1,556 @@
+{
+  "captured_at_utc": "2026-10-30 20:18:04 UTC",
+  "commit": "c655dac95766011a22e3f6eb6cff674af2396b13",
+  "run_id": 41120573160,
+  "url": "https://github.com/raeltec-systems/church-app/actions/runs/41120573160",
+  "workflow_status_at_capture": "in_progress",
+  "workflow_conclusion_at_capture": null,
+  "source_runtime_matches_main": true,
+  "jobs": [
+    {
+      "id": 124285858690,
+      "name": "db (local Supabase, pgTAP + API smoke + contract fixtures + isolated restore rehearsal)",
+      "status": "in_progress",
+      "conclusion": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pinned Supabase CLI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Shared contract fixtures (TypeScript mapping)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start local stack (services the tracer and the restore rehearsal need)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "pgTAP permission tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Data API smoke checks",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Isolated database-plus-object restore rehearsal (story 1.10, local journal)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop local stack",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 124285858820,
+      "name": "flutter (analyze, test, web build)",
+      "status": "in_progress",
+      "conclusion": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run subosito/flutter-action@v2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check pinned toolchain",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "contracts — pub get (locked)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "contracts — analyze",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "contracts — shared fixtures (Dart mapping)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "contracts — shared fixtures in Chrome (dart2js number model)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "design system — pub get (locked)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "design system — analyze",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "design system — test (tokens, contrast, accessible primitives)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "client core — pub get (locked)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "client core — analyze",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "client core — test (request states, adapters, boundaries)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "client core — duties in a non-Lusaka device zone (church time is device independent)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "client core — follow-ups in a non-Lusaka device zone (story 4.7 reminders and dates)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "mobile — pub get (locked)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "mobile — analyze",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "mobile — test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff — pub get (locked)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff — analyze",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff — test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff — build web",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff web trial — pub get (locked)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff web trial — analyze",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff web trial — test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "staff web trial — build web",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Web bundles carry no secret, JWT or service_role reference",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run subosito/flutter-action@v2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 124285858857,
+      "name": "policy (environments, migration promotion, secrets, staging drift)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Policy tool tests (offline)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Environment configs are separate, secret-free and fail closed",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Migrations are version-ordered, immutable once merged and non-destructive",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "No secrets in tracked files",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Edge Functions import nothing outside supabase/functions (shared code lives in _shared)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Staging migration-history drift (skipped until the owner adds SUPABASE_ACCESS_TOKEN)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 124285858868,
+      "name": "auth harness and identity E2E tools (offline unit tests)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Evidence holds no tokens, keys, passwords, OTPs or link tokens",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.1 evidence and identity E2E tool hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.2 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.3 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.4 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.5 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.6 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.7 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.8 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.9 evidence and the assisted-recovery function hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.10 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.11 evidence, the deletion worker and the deletion function hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.12 evidence and the support runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 2.14 staging evidence, the staging suite and the production package hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.1 evidence, the notification worker and its runbook hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.2 evidence and the owner seams guide hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.4 evidence, the notification worker function and the operations runbook hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.5 evidence holds no credentials or device tokens",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.6 evidence, the push adapter and the push runbook hold no credentials or device tokens",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.7 evidence (captured refresh signals) holds no credentials or private values",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.8 retrospective evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.9 retrospective evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.10 release evidence holds no credentials or personal data",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 3.3 evidence holds no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Duties evidence (every 4.x story) and the duties runbook hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.7 evidence (follow-up reminders), its E2E and the follow-ups runbook hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.8 evidence (duty deadlines and reminders), its E2E and the duties runbook hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.9 evidence (coverage queue, contact attempts, leader confirmation), its E2E and the duties and follow-ups runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.10 evidence (completion outcomes, corrections, assignment history), its E2E and the duties runbook hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.11 evidence (Duties and Follow-ups owner operations), its E2E and the contracts, duties and follow-ups runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.12 evidence (membership lifecycle and handover in Duties and Follow-ups), its E2E and the duties, follow-ups and identity runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.13 evidence (duties guides, the synthetic pilot rehearsal and the owner walkthrough), its E2E and the duties guides and runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.14 evidence (refactor sweep), the shared duties E2E helpers and the duties and follow-ups runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.16 evidence (the owner's epic 4 decisions), its E2E, migration and the duties, identity and promotion runbooks hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Story 4.15 evidence (closing suite, builds, owner demonstration), the closing suite and the production package hold no credentials",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "inspected_log_facts": {
+    "pgTAP_files": 72,
+    "pgTAP_tests": 5841,
+    "pgTAP_result": "All tests successful; Result: PASS",
+    "data_api_smoke_step": "success",
+    "isolated_database_object_restore_step": "success",
+    "staging_drift": "skipped: SUPABASE_ACCESS_TOKEN is not set"
+  },
+  "limitations": [
+    "At capture GitHub still reported workflow and two jobs in_progress although their listed steps, including Complete job, were successful. This record does not claim a completed green workflow.",
+    "This is isolated hosted CI, not local G1/G2, physical-device evidence, current hosted schema parity or acceptance.",
+    "Only sanitized step summaries/counts retained; original job logs remain on GitHub."
+  ]
+}

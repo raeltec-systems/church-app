@@ -1,0 +1,25 @@
+{
+    "scope":  "Offline harness and POSIX policy tests in network-disabled container, repository read-only; no database touched",
+    "finished_at_utc":  "2026-10-31T08:53:29.1756686Z",
+    "started_at_utc":  "2026-10-31T08:53:16.9798529Z",
+    "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+    "exit":  0,
+    "image":  "node:22-bookworm",
+    "totals":  {
+                   "policy":  {
+                                  "skipped":  0,
+                                  "tests":  56,
+                                  "failed":  0,
+                                  "passed":  56
+                              },
+                   "offline":  {
+                                   "skipped":  0,
+                                   "tests":  436,
+                                   "failed":  0,
+                                   "passed":  436
+                               }
+               },
+    "node_version":  "22.23.3",
+    "image_id":  "sha256:69a5713e7f4997e96d579aafd78734810e0dac0dd5ee4621d72c27a2891a4088",
+    "log_sha256":  "55e0800ca13268f38e52033a6cccbcff18b4d5c13fb55dec0f63ff6a1a2b0483"
+}

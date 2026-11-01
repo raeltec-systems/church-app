@@ -198,7 +198,7 @@ jobs:
       # A failure stops before any client build.
       - name: Deploy configured Edge Functions to the guarded project
         run: |
-          for function in identity-assisted-recovery identity-deletion notifications-worker; do
+          for function in identity-assisted-recovery identity-deletion notifications-worker content-assets; do
             npx supabase functions deploy "$function" \
               --project-ref "${{ steps.target.outputs.ref }}" \
               --no-verify-jwt

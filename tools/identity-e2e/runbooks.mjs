@@ -28,6 +28,7 @@
 // acknowledgements), as in the other identity E2Es.
 //
 // Usage: node tools/identity-e2e/runbooks.mjs [--evidence <file.jsonl>]
+import { removeLocalEdgeRuntime } from '../auth-harness/local-target.mjs';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -738,7 +739,7 @@ async function main() {
     try { process.kill(-serve.pid, 'SIGINT'); } catch { /* already gone */ }
     await sleep(3000);
     try { process.kill(-serve.pid, 'SIGKILL'); } catch { /* already gone */ }
-    try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+    try { removeLocalEdgeRuntime(); } catch { /* not running */ }
     rmSync(envDir, { recursive: true, force: true });
     psqlRaw(`select app.sys_revoke_credential('${assistedCredentialId}', '${OPERATOR}'); select app.sys_disable_principal('${assistedPrincipal}', '${OPERATOR}');
              select app.sys_revoke_credential('${deletionCredentialId}', '${OPERATOR}'); select app.sys_disable_principal('${deletionPrincipal}', '${OPERATOR}');`);

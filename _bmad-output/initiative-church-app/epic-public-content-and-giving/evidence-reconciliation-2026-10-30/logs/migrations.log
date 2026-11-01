@@ -1,0 +1,13 @@
+command: npm run ci:migrations -- --base origin/main
+cwd: .
+head: c96cd562b2650c37f5d3d879cb12891419700139
+started_utc: 2026-10-30T19:29:08.994797+00:00
+
+
+> ci:migrations
+> node tools/ci/check-migrations.mjs --base origin/main
+
+check-migrations: spawnSync git EPERM
+
+finished_utc: 2026-10-30T19:29:09.148504+00:00
+exit_code: 2

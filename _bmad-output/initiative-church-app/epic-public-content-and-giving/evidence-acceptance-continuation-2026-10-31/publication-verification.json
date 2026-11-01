@@ -1,0 +1,72 @@
+{
+  "checked_commit": "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+  "checked_files": 21,
+  "corrected": [
+    {
+      "file": "contracts-vm-lf-retry-result.json",
+      "previousPublishedHash": "befa025e5f3c1f5ef20b6395dfe301b892b6c077a27cf2e7f90eb8b9edff05bf",
+      "committedBlobHash": "1dfff523f4f8774a364d7e23933b35645e16d5deaf9afc326af4822962c1f38d",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "offline-retry-result.json",
+      "previousPublishedHash": "29f41fffae83160fea0b26ea9642cdbb9c79fbeaf9669196ce23ec1446f0921a",
+      "committedBlobHash": "89a595375cc119fdb7b539ae7e1e5bb2342a01eae1c87dad67238b01672a6907",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "identity-deletion-result.json",
+      "previousPublishedHash": "01672cb9fe1bcf5aa4a54322c00d263b7d5b7126d800987462aba34908e1647b",
+      "committedBlobHash": "0f0e575f3f307f3167fd0927107adf29fb0dfc0d2fb4b303946eed88ad57f7bd",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "identity-deletion-retry-result.json",
+      "previousPublishedHash": "2eac88a757b307ad408e926e6a2ec4bd88d623206fd104e913ae534a42df8f4e",
+      "committedBlobHash": "6467050f32d6887dc276fe58adeecc73ce8707aedcb4379c686c31a6c89958ac",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "identity-deletion-with-mail-result.json",
+      "previousPublishedHash": "520b8d23ddde05295a21923c1abd0b5a6bf09607a7d1bd50701476049b8d659b",
+      "committedBlobHash": "479385ec70f26edea8a5b01ac9981fd6652a2763a0d51b0552b1a1fad6fb04c9",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "identity-deletion-with-mail-stable-result.json",
+      "previousPublishedHash": "904161883607f458a2a14362542528860c0bfbc9c1328cddb92a93d27ed04a62",
+      "committedBlobHash": "788064056dfdbaa1af5d9b847106d47ca8d8d8b562913588b7344adce6814ac9",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "ci-engineering-head.json",
+      "previousPublishedHash": "9d853488991ddffa9b2fae0be7887a210aef1d89703db0820fdc98962b4ba7c8",
+      "committedBlobHash": "9be271965cd4b9c9076e43b43c1c497970b1a45994b223eda4c4cf311ab3cc20",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "ci-engineering-jobs.json",
+      "previousPublishedHash": "f52a8bcac9b0a973696c49dcef4615a2719825d71f0e5a74f95bf9ef8633550c",
+      "committedBlobHash": "12bee1e629f302ee1c7db29dae54d769933bc5871cf9f675a1037a5d8b20272f",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "cleanup-result.json",
+      "previousPublishedHash": "c66f83874ba8962805412b86b2b9b1dd6647a633c1883591f24490b997a50c0a",
+      "committedBlobHash": "543787c9848e1f8b92924b73ef5a993d976db6dfd46e9bb9b7ddb42cc675a03d",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "config-delta.json",
+      "previousPublishedHash": "882f76274b4460b70c6d448e37a47a7c81471ac50b05a8e67f1b85f074ec9982",
+      "committedBlobHash": "c91c7fab0ed9cf7d353cd3761cd54086fbb694a7e7283bb445b5e3a36af4c173",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    },
+    {
+      "file": "android-debug-build-result.json",
+      "previousPublishedHash": "8140538f7781d3ffe1354772683ded240e50d9f0668963da808367beb1556faa",
+      "committedBlobHash": "1038244de889e039b6d46c6b49c7c18eea0cdaf7904433ac14031080bd35da67",
+      "cause": "Git CRLF-to-LF publication conversion; original hash preserved"
+    }
+  ]
+}

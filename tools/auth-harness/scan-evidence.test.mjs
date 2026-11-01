@@ -3,12 +3,30 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-const scanner = new URL('./scan-evidence.sh', import.meta.url).pathname;
+// A URL pathname is not a native filesystem path on Windows and does not
+// decode spaces. Pass decoded paths to Bash with portable separators; no shell
+// interpolation is involved. An unavailable scanner must never count as a
+// successful negative security check.
+const scanner = fileURLToPath(new URL('./scan-evidence.sh', import.meta.url));
+// Native Windows Node must use Git Bash, not the unrelated System32 WSL launcher.
+// Nonstandard Git installations can provide an explicit executable path.
+const bash = process.env.SCAN_EVIDENCE_BASH ?? (process.platform === 'win32'
+  ? join(process.env.ProgramFiles ?? 'C:/Program Files', 'Git', 'bin', 'bash.exe')
+  : 'bash');
+const bashPath = (value) => process.platform === 'win32' ? value.replaceAll('\\', '/') : value;
+function scan(...args) {
+  const result = spawnSync(bash, [scanner, ...args].map(bashPath), { encoding: 'utf8' });
+  assert.ifError(result.error);
+  assert.ok([0, 1, 2].includes(result.status),
+    `scanner did not complete normally (${result.status}): ${result.stderr || result.stdout}`);
+  return result;
+}
 
 test('Story 3.10 personal-data scan rejects identifiers and contact details', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'scan-evidence-'));
+  const directory = mkdtempSync(join(tmpdir(), 'scan evidence #path-'));
   try {
     const evidence = join(directory, 'owner-review.md');
     const cases = [
@@ -34,12 +52,12 @@ test('Story 3.10 personal-data scan rejects identifiers and contact details', ()
 
     for (const value of cases) {
       writeFileSync(evidence, `${value}\n`);
-      const result = spawnSync('bash', [scanner, '--personal-data', evidence], { encoding: 'utf8' });
+      const result = scan('--personal-data', evidence);
       assert.notEqual(result.status, 0, `expected scan to reject ${value}`);
     }
 
     writeFileSync(evidence, 'Redacted checks complete. No personal values recorded.\n');
-    const clean = spawnSync('bash', [scanner, '--personal-data', evidence], { encoding: 'utf8' });
+    const clean = scan('--personal-data', evidence);
     assert.equal(clean.status, 0, clean.stderr || clean.stdout);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -47,11 +65,11 @@ test('Story 3.10 personal-data scan rejects identifiers and contact details', ()
 });
 
 test('Story 3.10 personal-data scan keeps product vocabulary clean', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'scan-evidence-'));
+  const directory = mkdtempSync(join(tmpdir(), 'scan evidence #path-'));
   try {
     const evidence = join(directory, 'README.md');
     writeFileSync(evidence, '## Staging Owner Acceptance\nMobile Android build: pass. Local Supabase and Edge Function suites pass. Client Core 428 tests.\n');
-    const clean = spawnSync('bash', [scanner, '--personal-data', evidence], { encoding: 'utf8' });
+    const clean = scan('--personal-data', evidence);
     assert.equal(clean.status, 0, clean.stderr || clean.stdout);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -59,21 +77,21 @@ test('Story 3.10 personal-data scan keeps product vocabulary clean', () => {
 });
 
 test('a missing path, an unknown flag or a flag in second position never reports clean', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'scan-evidence-'));
+  const directory = mkdtempSync(join(tmpdir(), 'scan evidence #path-'));
   try {
     const evidence = join(directory, 'owner-review.md');
     writeFileSync(evidence, 'phone: +12025550123\n');
-    const missing = spawnSync('bash', [scanner, '--personal-data', join(directory, 'nope')], { encoding: 'utf8' });
+    const missing = scan('--personal-data', join(directory, 'nope'));
     assert.equal(missing.status, 2);
     assert.match(missing.stderr, /no such path/);
     assert.doesNotMatch(missing.stdout, /clean/);
-    const unknown = spawnSync('bash', [scanner, '--personal', evidence], { encoding: 'utf8' });
+    const unknown = scan('--personal', evidence);
     assert.equal(unknown.status, 2);
     assert.match(unknown.stderr, /unknown option/);
-    const second = spawnSync('bash', [scanner, evidence, '--personal-data'], { encoding: 'utf8' });
+    const second = scan(evidence, '--personal-data');
     assert.notEqual(second.status, 0, 'the flag applies in any position');
     assert.doesNotMatch(second.stdout, /clean/);
-    const bare = spawnSync('bash', [scanner, '--personal-data'], { encoding: 'utf8' });
+    const bare = scan('--personal-data');
     assert.equal(bare.status, 2, '--personal-data needs an explicit path');
   } finally {
     rmSync(directory, { recursive: true, force: true });

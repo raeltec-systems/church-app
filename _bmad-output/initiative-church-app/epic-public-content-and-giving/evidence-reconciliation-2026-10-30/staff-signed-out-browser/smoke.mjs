@@ -1,0 +1,124 @@
+import { createServer } from 'node:http';
+import { readFile, stat, mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || '/opt/codex/runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
+const root=process.env.REPO_ROOT || '/workspace/scratch/308c700530ee/church-app';
+const out=path.join(root,'_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/staff-signed-out-browser');
+const web=process.env.STAFF_WEB_BUILD || '/tmp/church-app-staff-staging-browser-web';
+const started=new Date().toISOString();
+const config=JSON.parse(await readFile(process.env.STAGING_PUBLIC_CLIENT_CONFIG || '/tmp/church-app-staging-public-client.json','utf8'));
+const backend=new URL(config.SUPABASE_URL).origin;
+const sanitize=(value)=>Object.values(config).reduce((s,v)=>s.split(String(v)).join('[private-client-config]'),String(value)).replace(/sb_(?:publishable|secret)_[A-Za-z0-9_-]+/g,'[redacted]').replace(/eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,'[redacted]');
+await mkdir(out,{recursive:true});
+const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.wasm':'application/wasm','.ttf':'font/ttf','.otf':'font/otf','.png':'image/png','.svg':'image/svg+xml','.css':'text/css','.bin':'application/octet-stream'};
+const server=createServer(async(req,res)=>{
+ try{
+  if(!['GET','HEAD'].includes(req.method)){res.writeHead(405);res.end();return;}
+  let relative=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname).replace(/^\//,'');
+  if(!relative)relative='index.html';
+  const target=path.resolve(web,relative);
+  if(!target.startsWith(web+'/')){res.writeHead(403);res.end();return;}
+  const data=await readFile(target);res.writeHead(200,{'Content-Type':mime[path.extname(target)]||'application/octet-stream','Cache-Control':'no-store'});res.end(req.method==='HEAD'?undefined:data);
+ }catch{res.writeHead(404);res.end('not found');}
+});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const url=`http://127.0.0.1:${server.address().port}/`;
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE || '/workspace/scratch/308c700530ee/toolchains/chrome/chrome-headless-shell-linux64/chrome-headless-shell',args:['--no-sandbox','--enable-unsafe-swiftshader','--use-gl=swiftshader']});
+const context=await browser.newContext({viewport:{width:1280,height:900},locale:'en-GB',serviceWorkers:'block'});
+const traffic=[];const consoleMessages=[];const pageErrors=[];const denied=[];
+await context.route('**/*',async route=>{
+ const req=route.request();const u=new URL(req.url());
+ const kind=u.origin===new URL(url).origin?'local':u.origin===backend?'staging':'other';
+ const record={kind,method:req.method(),path:u.pathname};
+ if(!['GET','HEAD','OPTIONS'].includes(req.method())||kind==='other'){
+  denied.push(record);await route.abort('blockedbyclient');return;
+ }
+ traffic.push(record);await route.continue();
+});
+const page=await context.newPage();
+page.setDefaultTimeout(10000);
+page.on('console',msg=>{if(['error','warning'].includes(msg.type()))consoleMessages.push({type:msg.type(),text:sanitize(msg.text())});});
+page.on('pageerror',err=>pageErrors.push(sanitize(err.message)));
+const checks=[];const snapshots={};const focusStops=[];const screenshots=[];
+const check=(id,name,pass,detail={})=>checks.push({id,name,status:pass?'pass':'fail',detail});
+const shot=async name=>{await page.screenshot({path:path.join(out,name),fullPage:false});screenshots.push(name);};
+const active=()=>page.evaluate(()=>{const e=document.activeElement;const r=e?.getBoundingClientRect();return {tag:e?.tagName,role:e?.getAttribute('role'),name:e?.getAttribute('aria-label')||e?.textContent||'',rect:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};});
+let fatal=null;
+try{
+ await page.goto(url,{waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Sign in',exact:true}).waitFor({timeout:60000});
+ snapshots.landing=await page.locator('body').ariaSnapshot();
+ check('B01','Page identity and meaningful landing',await page.title()==='BICC Kafue staff'&&snapshots.landing.includes('BICC Kafue staff'),{url:page.url(),title:await page.title()});
+ check('B02','Signed-out landing has one entry action and no staff sections',await page.getByRole('button').count()===1&&await page.getByRole('list',{name:'Staff sections'}).count()===0);
+ await shot('desktop-landing.png');
+ await page.keyboard.press('Tab');
+ await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='button'&&document.activeElement?.textContent==='Sign in',null,{timeout:5000});
+ const landingFocus=await active();
+ check('B03','Keyboard Tab reaches named sign-in action',landingFocus.role==='button'&&landingFocus.name==='Sign in',{focus:landingFocus});
+ await shot('desktop-landing-focus.png');
+ await page.keyboard.press('Enter');
+ await page.getByRole('button',{name:'Forgot password?',exact:true}).waitFor();
+ snapshots.signin=await page.locator('body').ariaSnapshot();
+ check('B04','Keyboard Enter opens the sign-in screen',snapshots.signin.includes('textbox "Phone number (your username)"')&&snapshots.signin.includes('textbox "Password"'),{url:page.url()});
+ await shot('desktop-sign-in.png');
+ await page.getByRole('radio',{name:'Sign in',exact:true}).focus();
+ for(let i=0;i<11;i++){await page.keyboard.press('Tab');await page.waitForTimeout(70);focusStops.push(await active());}
+ check('B05','Keyboard traversal reaches phone, password, submit and help controls',['Phone number (your username)','Password','Sign in','Forgot password?','Get church help'].every(name=>focusStops.some(x=>x.name===name)),{stops:focusStops});
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
+ await page.getByText('Enter your phone number.',{exact:true}).waitFor();
+ await page.getByText('Enter your password.',{exact:true}).waitFor();
+ snapshots.emptyForm=await page.locator('body').ariaSnapshot();
+ check('B06','Empty sign-in stays local and shows both field errors',snapshots.emptyForm.includes('Enter your phone number.')&&snapshots.emptyForm.includes('Enter your password.'));
+ await shot('desktop-empty-validation.png');
+ await page.getByRole('radio',{name:'Create account',exact:true}).click();
+ await page.getByText('Choose a password only you know. Church staff will never ask for it.',{exact:true}).waitFor();
+ check('B07','Create-account mode is reachable without submitting',await page.getByRole('heading',{name:'Create account',exact:true}).count()===1);
+ await page.getByRole('radio',{name:'Sign in',exact:true}).click();
+ await page.getByRole('heading',{name:'Sign in',exact:true}).waitFor();
+ check('B08','Switching back recovers from local validation state',await page.getByText('Enter your phone number.',{exact:true}).count()===0&&await page.getByText('Enter your password.',{exact:true}).count()===0);
+ await page.getByRole('button',{name:'Show password',exact:true}).click();
+ await page.mouse.move(20,20);
+ await page.waitForTimeout(250);
+ snapshots.passwordVisible=await page.locator('body').ariaSnapshot();
+ const toggle=page.getByRole('button',{name:/Hide password/});
+ check('B09','Password visibility toggle updates its accessible action',await toggle.count()===1,{snapshot:snapshots.passwordVisible});
+ if(await toggle.count()===1)await toggle.click();
+ else if(await page.getByRole('button',{name:/Show password/}).count()===1)await page.getByRole('button',{name:/Show password/}).click();
+ await page.getByRole('button',{name:'Get church help',exact:true}).click();
+ await page.getByRole('heading',{name:/^Get help from the church/}).waitFor();
+ snapshots.help=await page.locator('body').ariaSnapshot();
+ check('B10','Church-help action explains the real recovery route',snapshots.help.includes('Staff never ask for, choose or see your password'));
+ await page.getByRole('heading',{name:/^Get help from the church/}).scrollIntoViewIfNeeded();
+ await shot('desktop-help.png');
+ await page.getByRole('button',{name:'Forgot password?',exact:true}).click();
+ await page.getByRole('button',{name:'Back to sign in',exact:true}).waitFor();
+ snapshots.forgot=await page.locator('body').ariaSnapshot();
+ check('B11','Forgot-password entry and return are reachable without sending email',snapshots.forgot.includes('Recovery email')&&snapshots.forgot.includes('Back to sign in'));
+ await shot('desktop-forgot-password.png');
+ await page.getByRole('button',{name:'Back to sign in',exact:true}).click();
+ await page.getByRole('textbox',{name:'Phone number (your username)',exact:true}).waitFor();
+ check('B12','Back to sign in returns to empty credential fields',(await page.getByRole('textbox',{name:'Phone number (your username)',exact:true}).inputValue())===''&&(await page.getByRole('textbox',{name:'Password',exact:true}).inputValue())==='');
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Forgot password?',exact:true}).waitFor();
+ check('B13','Reload restores the signed-out sign-in route',page.url().includes('sign-in'));
+ await page.setViewportSize({width:390,height:844});
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Forgot password?',exact:true}).waitFor();
+ snapshots.narrow=await page.locator('body').ariaSnapshot();
+ const layout=await page.evaluate(async()=>{window.scrollTo({left:500,top:0});await new Promise(resolve=>requestAnimationFrame(resolve));const result={innerWidth:innerWidth,scrollWidth:document.scrollingElement.scrollWidth,bodyScrollWidth:document.body.scrollWidth,scrollingElement:document.scrollingElement.tagName,actualHorizontalScroll:window.scrollX};window.scrollTo({left:0,top:0});return result;});
+ const inputBoxes=await Promise.all(['Phone number (your username)','Password'].map(name=>page.getByRole('textbox',{name,exact:true}).boundingBox()));
+ check('B14','Narrow sign-in fields fit without page-level horizontal overflow',layout.scrollWidth<=390&&layout.actualHorizontalScroll===0&&inputBoxes.every(b=>b&&b.x>=-1&&b.x+b.width<=391),{viewport:{width:390,height:844},layout,inputBoxes});
+ await shot('narrow-sign-in.png');
+ await page.getByRole('button',{name:'Get church help',exact:true}).click();
+ await page.getByRole('heading',{name:/^Get help from the church/}).scrollIntoViewIfNeeded();
+ check('B15','Narrow layout scrolls to church help',await page.getByRole('heading',{name:/^Get help from the church/}).isVisible());
+ await shot('narrow-help.png');
+}catch(error){fatal=sanitize(error.message);snapshots.failure=await page.locator('body').ariaSnapshot().catch(()=>null);await shot('failure-state.png').catch(()=>{});}
+check('B16','No framework/runtime page error',pageErrors.length===0,{pageErrors});
+check('B17','No auth or mutation request attempted',denied.length===0&&traffic.every(x=>['GET','HEAD','OPTIONS'].includes(x.method)),{denied,stagingRequestCount:traffic.filter(x=>x.kind==='staging').length});
+const result={source_head:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),started_utc:started,finished_utc:new Date().toISOString(),status:fatal||checks.some(x=>x.status==='fail')?'run-failed':'run-passed',browser_plugin:'Browser plugin not available; installed Playwright used',playwright_version:'1.62.1',chromium_version:browser.version(),build_config:'Staging public-client configuration consumed privately; configured bundle remains outside the repository',origin:url,viewports:[{width:1280,height:900},{width:390,height:844}],checks,snapshots,screenshots,traffic,denied,consoleMessages,pageErrors,fatal,scope_limitations:['Fresh signed-out context only; no credentials, account creation, email sending or notification actions.','The current signed-out staff routes issue no backend reads. Configured build and browser behavior do not establish staging backend workflow acceptance.','Empty-form recovery is local UI validation, not failed-login/backend retry evidence.','Semantic names and keyboard traversal are a smoke check, not a complete accessibility audit.']};
+await writeFile(path.join(out,'results.json'),JSON.stringify(result,null,2)+'\n');
+await context.close();await browser.close();await new Promise(resolve=>server.close(resolve));
+console.log(JSON.stringify({status:result.status,checks:checks.map(({id,name,status})=>({id,name,status})),stagingRequestCount:traffic.filter(x=>x.kind==='staging').length,deniedCount:denied.length,pageErrors,fatal},null,2));
+if(result.status!=='run-passed')process.exitCode=1;

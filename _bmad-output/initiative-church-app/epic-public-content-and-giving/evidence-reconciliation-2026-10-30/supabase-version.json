@@ -1,0 +1,12 @@
+{
+  "name": "supabase-version",
+  "command": "npx --no-install supabase --version",
+  "cwd": ".",
+  "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "started_utc": "2026-10-30T19:29:44.615822+00:00",
+  "finished_utc": "2026-10-30T19:29:45.406917+00:00",
+  "exit_code": 1,
+  "status": "run-failed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/supabase-version.log",
+  "interpretation": "Default sandbox made CLI user cache read-only; superseded by supabase-version-retry."
+}

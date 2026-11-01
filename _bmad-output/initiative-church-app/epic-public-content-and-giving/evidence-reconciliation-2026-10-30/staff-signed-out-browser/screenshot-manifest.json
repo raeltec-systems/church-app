@@ -1,0 +1,65 @@
+{
+  "generated_utc": "2026-10-30T20:15:21.828937+00:00",
+  "files": [
+    {
+      "path": "desktop-landing.png",
+      "bytes": 33421,
+      "sha256": "574ae5230bec5a7e918983121712562ca6052ad2baf2134fddabd2322a08b952",
+      "kind": "final"
+    },
+    {
+      "path": "desktop-landing-focus.png",
+      "bytes": 36405,
+      "sha256": "f41f5e92ad8253ccdd5015e9ab2c827f908860e202ad5816ac167d14c6fc3a42",
+      "kind": "final"
+    },
+    {
+      "path": "desktop-sign-in.png",
+      "bytes": 45092,
+      "sha256": "f19cb883ed3a81d4f4f652c004ae53d40d068356603b8b6836e4909820b458fd",
+      "kind": "final"
+    },
+    {
+      "path": "desktop-empty-validation.png",
+      "bytes": 45671,
+      "sha256": "54fa69020385023936dda8c4f6385006cb0290e2497ee4d6dfe8634a9cde436f",
+      "kind": "final"
+    },
+    {
+      "path": "desktop-help.png",
+      "bytes": 61914,
+      "sha256": "a5c461c192f3742b82b107cc6846ad0264afb5b81440c18bc2a9af43c572a46d",
+      "kind": "final"
+    },
+    {
+      "path": "desktop-forgot-password.png",
+      "bytes": 36829,
+      "sha256": "af45e4733a6034653234cdb097425af7af632abe8a6d42ecd987cf483e8c3dab",
+      "kind": "final"
+    },
+    {
+      "path": "narrow-sign-in.png",
+      "bytes": 38881,
+      "sha256": "4de6adeedbc2af294a6f6f83fc61ef871cf8248db66db0375d425b0110d255ad",
+      "kind": "final"
+    },
+    {
+      "path": "narrow-help.png",
+      "bytes": 52957,
+      "sha256": "d03887b5822635469dcc6f4c8c12add6369b8341f3ba57277ba5bed9c4f9b941",
+      "kind": "final"
+    },
+    {
+      "path": "attempt-1-toggle-state.png",
+      "bytes": 47200,
+      "sha256": "2ab208d63a3ae6c97f790712b9425a3b984c910bd04f83cd9657cd0020607782",
+      "kind": "preserved-harness-observation"
+    },
+    {
+      "path": "attempt-2-help-state.png",
+      "bytes": 61914,
+      "sha256": "a5c461c192f3742b82b107cc6846ad0264afb5b81440c18bc2a9af43c572a46d",
+      "kind": "preserved-harness-observation"
+    }
+  ]
+}

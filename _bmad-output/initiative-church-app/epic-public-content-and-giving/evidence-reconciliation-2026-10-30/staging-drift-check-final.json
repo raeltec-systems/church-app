@@ -1,0 +1,20 @@
+{
+  "command": [
+    "node",
+    "tools/ci/check-migration-drift.mjs",
+    "--env",
+    "staging",
+    "--hosted-file",
+    "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/staging-migration-history.json",
+    "--require-synced"
+  ],
+  "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+  "started_at_utc": "2026-10-30T20:18:44.809744+00:00",
+  "finished_at_utc": "2026-10-30T20:18:44.871963+00:00",
+  "status": "run-failed",
+  "exit_code": 1,
+  "observation_at_utc": "2026-10-30T19:48:59Z",
+  "source": "staging-migration-history.json",
+  "evidence": "staging-drift-check-final.log",
+  "meaning": "Actual required-sync checker fails on the captured 99/101 history; this rerun makes no new live database observation and does not change history."
+}

@@ -1,0 +1,12 @@
+{
+  "name": "drift-check",
+  "command": "npm run ci:drift:staging",
+  "cwd": ".",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:39:19.218588+00:00",
+  "finished_utc": "2026-10-30T19:39:19.365493+00:00",
+  "exit_code": 0,
+  "status": "skipped",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/drift-check.log",
+  "interpretation": "The script exited 0 but explicitly skipped: SUPABASE_ACCESS_TOKEN is not set. No hosted migration parity was checked."
+}

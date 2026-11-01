@@ -93,6 +93,7 @@ late _FakeCalendar _calendar;
 /// with a poster and two places.
 Map<String, Object?> campData({
   Map<String, Object?>? rsvp,
+  bool rsvpEnabled = true,
   bool poster = true,
 }) => publicEventData(
   eventId: _camp,
@@ -103,11 +104,15 @@ Map<String, Object?> campData({
   location: 'SYNTHETIC Camp grounds',
   publicationRevision: 3,
   poster: poster ? publicEventPosterData(eventId: _camp) : null,
-  rsvp: rsvp ?? publicEventRsvpData(),
+  rsvp: rsvpEnabled ? rsvp ?? publicEventRsvpData() : null,
 );
 
-void seedCamp(ClientTestHarness h, {Map<String, Object?>? rsvp}) {
-  final camp = campData(rsvp: rsvp);
+void seedCamp(
+  ClientTestHarness h, {
+  Map<String, Object?>? rsvp,
+  bool rsvpEnabled = true,
+}) {
+  final camp = campData(rsvp: rsvp, rsvpEnabled: rsvpEnabled);
   h.content.publicEvents = AccessReadOk(
     PublicEvents.fromJson(publicEventsData([camp])),
   );
@@ -495,6 +500,203 @@ void main() {
       h.gateway.sent.single.confirm({'rsvp_state': 'cancelled'}, 2);
       await settle(tester);
       expect(byKey('event-rsvp-notice-cancelled'), findsOneWidget);
+    });
+
+    testWidgets(
+      'disabling new RSVPs keeps existing cancellation and its safe retry',
+      (tester) async {
+        final h = await pumpAt(
+          tester,
+          CalendarPaths.event(_camp),
+          setUp: (h) {
+            seedCamp(h);
+            h.grants.myAccess = AccessReadOk(syntheticGrants());
+            h.content.myRsvp[_camp] = AccessReadOk(
+              MyEventRsvp.fromJson(
+                myEventRsvpData(eventId: _camp, state: 'going'),
+              ),
+            );
+          },
+        );
+        seedCamp(h, rsvpEnabled: false);
+        await tapKey(tester, 'event-reload');
+        expect(byKey('event-rsvp-going'), findsOneWidget);
+        expect(byKey('event-rsvp-going-button'), findsNothing);
+        await tapKey(tester, 'event-rsvp-cancel');
+        expect(
+          find.textContaining('cannot rejoin unless RSVPs reopen'),
+          findsOneWidget,
+        );
+        await tapKey(tester, 'event-rsvp-keep');
+        expect(h.gateway.sent, isEmpty);
+        await tapKey(tester, 'event-rsvp-cancel');
+        await tapKey(tester, 'event-rsvp-cancel-confirm');
+        final sent = h.gateway.sent.single;
+        expect(sent.request.command, ContentCommands.cancelRsvp);
+        expect(sent.wire['payload'], {'event_id': _camp});
+        expect(
+          tester.widget<TextButton>(byKey('event-rsvp-cancel')).onPressed,
+          isNull,
+          reason: 'the in-flight cancellation cannot be submitted twice',
+        );
+        sent.unknown();
+        await settle(tester);
+        await tapKey(tester, 'event-rsvp-check-again');
+        expect(h.gateway.sent, hasLength(2));
+        expect(h.gateway.sent.last.request.command, ContentCommands.cancelRsvp);
+        expect(h.gateway.sent.last.wire['request_id'], sent.wire['request_id']);
+        h.content.myRsvp[_camp] = AccessReadOk(
+          MyEventRsvp.fromJson(
+            myEventRsvpData(eventId: _camp, state: 'cancelled'),
+          ),
+        );
+        h.gateway.sent.last.confirm({'rsvp_state': 'cancelled'}, 2);
+        await settle(tester);
+        expect(byKey('event-rsvp-cancel'), findsNothing);
+        expect(byKey('event-rsvp-going-button'), findsNothing);
+        expect(byKey('event-rsvp-disabled'), findsOneWidget);
+        expect(
+          textOf(tester, 'event-rsvp-notice-cancelled'),
+          'Your RSVP is cancelled. This event is not taking new RSVPs.',
+        );
+      },
+    );
+
+    testWidgets('disabled RSVPs offer no new registration to a member', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        CalendarPaths.event(_camp),
+        setUp: (h) {
+          seedCamp(h, rsvpEnabled: false);
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+        },
+      );
+      expect(h.content.myRsvpAsked, [_camp]);
+      expect(byKey('event-rsvp-disabled'), findsOneWidget);
+      expect(byKey('event-rsvp-going-button'), findsNothing);
+      expect(byKey('event-rsvp-cancel'), findsNothing);
+      expect(h.gateway.sent, isEmpty);
+    });
+
+    testWidgets('disabled RSVPs never request a guest own-RSVP read', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        CalendarPaths.event(_camp),
+        account: null,
+        setUp: (h) => seedCamp(h, rsvpEnabled: false),
+      );
+      expect(byKey('event-rsvp'), findsNothing);
+      expect(h.content.myRsvpAsked, isEmpty);
+      expect(h.gateway.sent, isEmpty);
+    });
+
+    testWidgets('disabled RSVPs preserve member-access denial', (tester) async {
+      final h = await pumpAt(
+        tester,
+        CalendarPaths.event(_camp),
+        setUp: (h) {
+          seedCamp(h, rsvpEnabled: false);
+          h.grants.myAccess = const AccessReadDenied(AccessDenial.notLinked);
+          h.content.myRsvp[_camp] = AccessReadOk(
+            MyEventRsvp.fromJson(
+              myEventRsvpData(eventId: _camp, state: 'going'),
+            ),
+          );
+        },
+      );
+      expect(byKey('event-rsvp-members-only'), findsOneWidget);
+      expect(byKey('event-rsvp-cancel'), findsNothing);
+      expect(byKey('event-rsvp-going-button'), findsNothing);
+      expect(h.gateway.sent, isEmpty);
+    });
+
+    testWidgets('disabled RSVPs cannot be cancelled after the event starts', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        CalendarPaths.event(_camp),
+        setUp: (h) {
+          final started = campData(rsvpEnabled: false)
+            ..['starts_at'] = '2000-10-09T07:00:00.000000Z'
+            ..['ends_at'] = '2000-10-11T15:00:00.000000Z';
+          h.content.publicEvent[_camp] = AccessReadOk(
+            PublicEventRead.fromJson({'event': started}),
+          );
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.content.myRsvp[_camp] = AccessReadOk(
+            MyEventRsvp.fromJson(
+              myEventRsvpData(eventId: _camp, state: 'going'),
+            ),
+          );
+        },
+      );
+      expect(byKey('event-rsvp-closed'), findsOneWidget);
+      expect(byKey('event-rsvp-cancel'), findsNothing);
+      expect(byKey('event-rsvp-going-button'), findsNothing);
+      expect(h.content.myRsvpAsked, isEmpty);
+      expect(h.gateway.sent, isEmpty);
+    });
+
+    testWidgets('failed own-RSVP read offers retry instead of a cancellation', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        CalendarPaths.event(_camp),
+        setUp: (h) {
+          seedCamp(h, rsvpEnabled: false);
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.content.myRsvp[_camp] = const AccessReadFailed(unreachable: true);
+        },
+      );
+      expect(byKey('event-rsvp-failed'), findsOneWidget);
+      expect(byKey('event-rsvp-cancel'), findsNothing);
+      expect(byKey('event-rsvp-going-button'), findsNothing);
+      expect(h.gateway.sent, isEmpty);
+      h.content.myRsvp[_camp] = AccessReadOk(
+        MyEventRsvp.fromJson(myEventRsvpData(eventId: _camp, state: 'going')),
+      );
+      await tapKey(tester, 'event-rsvp-retry');
+      expect(byKey('event-rsvp-cancel'), findsOneWidget);
+      expect(byKey('event-rsvp-going-button'), findsNothing);
+    });
+
+    testWidgets('saved offline event never enables private RSVP actions', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        CalendarPaths.event(_camp),
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.publicContentCache
+            ..available = true
+            ..events = PublicContentSnapshot(
+              value: PublicEvents.fromJson(
+                publicEventsData([campData(rsvpEnabled: false, poster: false)]),
+              ),
+              savedAt: DateTime.utc(2026, 10, 31),
+            );
+          h.content.publicEvent[_camp] = const AccessReadFailed(
+            unreachable: true,
+          );
+          h.content.myRsvp[_camp] = AccessReadOk(
+            MyEventRsvp.fromJson(
+              myEventRsvpData(eventId: _camp, state: 'going'),
+            ),
+          );
+        },
+      );
+      expect(byKey('event-title'), findsOneWidget);
+      expect(byKey('event-stale'), findsOneWidget);
+      expect(byKey('event-rsvp'), findsNothing);
+      expect(h.content.myRsvpAsked, isEmpty);
+      expect(h.gateway.sent, isEmpty);
     });
 
     testWidgets('full and closed events offer no answer', (tester) async {

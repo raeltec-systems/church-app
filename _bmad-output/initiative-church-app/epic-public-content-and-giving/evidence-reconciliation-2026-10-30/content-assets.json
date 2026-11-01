@@ -1,0 +1,12 @@
+{
+  "name": "content-assets",
+  "command": "node --test supabase/functions/content-assets/*.test.mjs",
+  "cwd": ".",
+  "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "started_utc": "2026-10-30T19:29:44.349187+00:00",
+  "finished_utc": "2026-10-30T19:29:44.585070+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/content-assets.log",
+  "interpretation": "Default sandbox produced only four file-level TAP results; use content-assets-retry for the 34 individual assertion results."
+}

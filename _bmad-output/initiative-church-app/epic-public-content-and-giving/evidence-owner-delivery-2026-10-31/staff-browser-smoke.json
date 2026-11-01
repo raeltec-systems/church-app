@@ -1,0 +1,23 @@
+{
+  "source": "33e97b2c4443578a0a86a92c02014b5730048bbd",
+  "url": "https://bic-kafue-staff-staging-israel-muyobas-projects.vercel.app",
+  "httpStatus": 200,
+  "title": "BICC Kafue staff",
+  "flutterView": 1,
+  "pageErrors": [],
+  "failedRequests": [],
+  "backendStatusCounts": {},
+  "buildInfo": {
+    "status": 200,
+    "body": {
+      "artifact": "web",
+      "environment": "staging",
+      "commit": "33e97b2c4443578a0a86a92c02014b5730048bbd",
+      "supabase_api_url": "https://tmurpotfluignacfueki.supabase.co",
+      "file_count": 53,
+      "tree_sha256": "96b973edb685f82ffc19cd397afd45ce7bc6c5c3ff6554ac38f71960a59af9b1",
+      "sealed_at": "2026-10-31T10:19:25.353Z"
+    }
+  },
+  "scope": "Signed-out initial rendered page only. No credentials entered; no signed-in acceptance; no fixture writes."
+}

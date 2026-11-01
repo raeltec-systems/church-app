@@ -1,0 +1,31 @@
+{
+  "observed_at_utc": "2026-10-30T20:11:57.038646+00:00",
+  "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+  "fresh_origin_main": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "runtime_source_dependency_config_diff": [],
+  "allowed_app_documentation_diff": [
+    "apps/mobile/README.md",
+    "apps/staff/README.md"
+  ],
+  "git_diff_check_exit": 0,
+  "local_markdown_links_checked": 152,
+  "missing_local_links": [],
+  "real_tree_ticket_counts": {
+    "total": 84,
+    "review": 26,
+    "done": 50,
+    "in-progress": 7,
+    "planned": 1
+  },
+  "ticket_structure_issues": {
+    "unpinned_after": [],
+    "undeclared_after": [],
+    "order_conflict": []
+  },
+  "pre_existing_ticket_warnings": [
+    "epic-public-content-and-giving/story-f1-giving-admin-tenure-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+    "epic-public-content-and-giving/story-f2-church-owned-images-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+    "epic-public-content-and-giving/story-f3-delete-unreferenced-uploads-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped"
+  ],
+  "new_epic7_canonical_exists": false
+}

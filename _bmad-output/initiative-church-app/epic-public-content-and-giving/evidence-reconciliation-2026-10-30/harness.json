@@ -1,0 +1,11 @@
+{
+  "name": "harness",
+  "command": "node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs tools/hymn-book/*.test.mjs",
+  "cwd": ".",
+  "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "started_utc": "2026-10-30T19:29:14.734213+00:00",
+  "finished_utc": "2026-10-30T19:29:16.469231+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/harness.log"
+}

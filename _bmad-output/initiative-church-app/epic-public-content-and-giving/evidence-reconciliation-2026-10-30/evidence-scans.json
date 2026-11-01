@@ -1,0 +1,11 @@
+{
+  "name": "evidence-scans",
+  "command": "bash /workspace/scratch/308c700530ee/church-evidence-scans.sh",
+  "cwd": ".",
+  "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "started_utc": "2026-10-30T19:29:42.805278+00:00",
+  "finished_utc": "2026-10-30T19:29:44.313003+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/evidence-scans.log"
+}

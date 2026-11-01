@@ -1,0 +1,11 @@
+{
+  "name": "client-core-analyze",
+  "command": "flutter analyze",
+  "cwd": "packages/client_core",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:39:29.531057+00:00",
+  "finished_utc": "2026-10-30T19:39:54.425209+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/client-core-analyze.log.gz"
+}

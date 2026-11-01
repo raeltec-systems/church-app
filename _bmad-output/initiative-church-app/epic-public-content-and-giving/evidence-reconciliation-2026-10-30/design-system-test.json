@@ -1,0 +1,11 @@
+{
+  "name": "design-system-test",
+  "command": "flutter test --reporter expanded",
+  "cwd": "packages/design_system",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:39:04.205433+00:00",
+  "finished_utc": "2026-10-30T19:39:16.359921+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/design-system-test.log"
+}

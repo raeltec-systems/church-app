@@ -1,0 +1,9 @@
+{
+    "finished_at_utc":  "2026-10-31T08:25:37.0580436Z",
+    "started_at_utc":  "2026-10-31T08:24:51.3979142Z",
+    "command":  "node tools/identity-e2e/deletion.mjs --evidence \u003cprivate-output\u003e/identity-deletion-retry.jsonl",
+    "result":  "run-failed",
+    "head":  "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "exit":  1,
+    "target":  "church-content-acceptance-20261031"
+}

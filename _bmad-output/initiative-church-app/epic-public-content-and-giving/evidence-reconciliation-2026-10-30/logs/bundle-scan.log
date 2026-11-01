@@ -1,0 +1,9 @@
+command: node tools/ci/scan-secrets.mjs --bundle apps/staff/build/web trials/staff_web/build/web
+cwd: .
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:56:22.785452+00:00
+
+scan-secrets: clean (bundle mode, 91 files)
+
+finished_utc: 2026-10-30T19:56:23.240185+00:00
+exit_code: 0

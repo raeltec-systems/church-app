@@ -1,0 +1,2 @@
+{"step":"D00-precondition","target":"LOCAL","at":"2026-10-31T08:28:11.363Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0","function_served":true,"verify_jwt":false,"journal_entries_before":0}
+{"step":"D100-cleanup","target":"LOCAL","at":"2026-10-31T08:28:16.096Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"isolated_removed":false,"unmarked":true,"journal_and_acks_kept":"append-only"}

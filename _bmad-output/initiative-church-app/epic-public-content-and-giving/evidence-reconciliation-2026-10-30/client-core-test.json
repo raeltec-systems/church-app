@@ -1,0 +1,12 @@
+{
+  "name": "client-core-test",
+  "command": "flutter test --reporter expanded",
+  "cwd": "packages/client_core",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:39:54.473921+00:00",
+  "finished_utc": "2026-10-30T19:47:26.384761+00:00",
+  "exit_code": 0,
+  "status": "skipped",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/client-core-test.log",
+  "interpretation": "Incomplete attempt during resource contention; explicitly stopped before the success marker. Flutter handled termination with exit 0, which is NOT a passed test/build. Use the -retry result; no acceptance claim from this attempt."
+}

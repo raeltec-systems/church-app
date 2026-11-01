@@ -1,0 +1,2478 @@
+command: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs tools/hymn-book/*.test.mjs
+cwd: .
+head: c96cd562b2650c37f5d3d879cb12891419700139
+started_utc: 2026-10-30T19:29:14.734213+00:00
+
+TAP version 13
+# Subtest: canonical UUID and system credential shapes stay lowercase and environment-bound
+ok 1 - canonical UUID and system credential shapes stay lowercase and environment-bound
+  ---
+  duration_ms: 1.298567
+  type: 'test'
+  ...
+# Subtest: Content-Length parsing is caller-limited and fails closed on malformed values
+ok 2 - Content-Length parsing is caller-limited and fails closed on malformed values
+  ---
+  duration_ms: 0.419312
+  type: 'test'
+  ...
+# Subtest: request helpers preserve legacy key headers and system envelope shape
+ok 3 - request helpers preserve legacy key headers and system envelope shape
+  ---
+  duration_ms: 0.866456
+  type: 'test'
+  ...
+# Subtest: PNG, JPEG and WebP are measured from their bytes
+ok 4 - PNG, JPEG and WebP are measured from their bytes
+  ---
+  duration_ms: 2.586698
+  type: 'test'
+  ...
+# Subtest: a disguised or unknown file is refused whatever its name or declared type
+ok 5 - a disguised or unknown file is refused whatever its name or declared type
+  ---
+  duration_ms: 0.397479
+  type: 'test'
+  ...
+# Subtest: a right signature with an unreadable header is an invalid image
+ok 6 - a right signature with an unreadable header is an invalid image
+  ---
+  duration_ms: 0.287803
+  type: 'test'
+  ...
+# Subtest: a declared type that contradicts the bytes is a mismatch; no declaration claims nothing
+ok 7 - a declared type that contradicts the bytes is a mismatch; no declaration claims nothing
+  ---
+  duration_ms: 0.226601
+  type: 'test'
+  ...
+# Subtest: requests: three actions, each with exactly its parameters and method
+ok 8 - requests: three actions, each with exactly its parameters and method
+  ---
+  duration_ms: 1.134319
+  type: 'test'
+  ...
+# Subtest: retention request body is bounded and rejects caller-selected fields
+ok 9 - retention request body is bounded and rejects caller-selected fields
+  ---
+  duration_ms: 0.304139
+  type: 'test'
+  ...
+# Subtest: retention requires a well-formed purpose credential and the scheduler trigger
+ok 10 - retention requires a well-formed purpose credential and the scheduler trigger
+  ---
+  duration_ms: 0.473744
+  type: 'test'
+  ...
+# Subtest: retention claims accept only bounded, well-formed private draft paths
+ok 11 - retention claims accept only bounded, well-formed private draft paths
+  ---
+  duration_ms: 0.532883
+  type: 'test'
+  ...
+# Subtest: only a bearer token is accepted as the caller
+ok 12 - only a bearer token is accepted as the caller
+  ---
+  duration_ms: 0.439472
+  type: 'test'
+  ...
+# Subtest: size: the declared length and the 10 MiB body cap
+ok 13 - size: the declared length and the 10 MiB body cap
+  ---
+  duration_ms: 0.529638
+  type: 'test'
+  ...
+# Subtest: database refusals map to statuses carrying only codes
+ok 14 - database refusals map to statuses carrying only codes
+  ---
+  duration_ms: 0.545633
+  type: 'test'
+  ...
+# Subtest: a sync plan keeps only well-formed entries
+ok 15 - a sync plan keeps only well-formed entries
+  ---
+  duration_ms: 0.473524
+  type: 'test'
+  ...
+# Subtest: uploads are creates (expected null); CORS allows staff web without cookies
+ok 16 - uploads are creates (expected null); CORS allows staff web without cookies
+  ---
+  duration_ms: 20.43412
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan refused with 401: the withdrawn origin object ends absent
+ok 17 - F1 follow-up: post-upload plan refused with 401: the withdrawn origin object ends absent
+  ---
+  duration_ms: 32.572008
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: after the 401 refusal every retry ends in a safe terminal state
+ok 18 - F1 follow-up: after the 401 refusal every retry ends in a safe terminal state
+  ---
+  duration_ms: 3.172561
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan refused with 403: the withdrawn origin object ends absent
+ok 19 - F1 follow-up: post-upload plan refused with 403: the withdrawn origin object ends absent
+  ---
+  duration_ms: 1.610527
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: after the 403 refusal every retry ends in a safe terminal state
+ok 20 - F1 follow-up: after the 403 refusal every retry ends in a safe terminal state
+  ---
+  duration_ms: 2.244663
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan refused with 503: the withdrawn origin object ends absent
+ok 21 - F1 follow-up: post-upload plan refused with 503: the withdrawn origin object ends absent
+  ---
+  duration_ms: 1.233468
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: after the 503 refusal every retry ends in a safe terminal state
+ok 22 - F1 follow-up: after the 503 refusal every retry ends in a safe terminal state
+  ---
+  duration_ms: 3.10502
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan read times out: the withdrawn origin object ends absent
+ok 23 - F1 follow-up: post-upload plan read times out: the withdrawn origin object ends absent
+  ---
+  duration_ms: 1.204175
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: a still-wanted file removed after a refusal is restored by the next authorized sync
+ok 24 - F1 follow-up: a still-wanted file removed after a refusal is restored by the next authorized sync
+  ---
+  duration_ms: 1.744579
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: a cleanup delete that fails is retried a bounded number of times, then the next sync removes it
+ok 25 - F1 follow-up: a cleanup delete that fails is retried a bounded number of times, then the next sync removes it
+  ---
+  duration_ms: 1.900605
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: logic: a refused read after placement removes exactly the placed paths
+ok 26 - F1 follow-up: logic: a refused read after placement removes exactly the placed paths
+  ---
+  duration_ms: 0.796831
+  type: 'test'
+  ...
+# Subtest: a complete PNG keeps its pixels; text chunks and appended bytes are dropped
+ok 27 - a complete PNG keeps its pixels; text chunks and appended bytes are dropped
+  ---
+  duration_ms: 84.812689
+  type: 'test'
+  ...
+# Subtest: a PNG header alone, a truncated, corrupted or short PNG is an invalid image
+ok 28 - a PNG header alone, a truncated, corrupted or short PNG is an invalid image
+  ---
+  duration_ms: 64.395319
+  type: 'test'
+  ...
+# Subtest: a JPEG keeps its frame and scans; Exif, comments and appended bytes are dropped
+ok 29 - a JPEG keeps its frame and scans; Exif, comments and appended bytes are dropped
+  ---
+  duration_ms: 1.51998
+  type: 'test'
+  ...
+# Subtest: a WebP keeps its image; Exif, XMP and appended bytes are dropped; animation is refused
+ok 30 - a WebP keeps its image; Exif, XMP and appended bytes are dropped; animation is refused
+  ---
+  duration_ms: 1.248662
+  type: 'test'
+  ...
+# Subtest: F1 logic: withdrawal and its sync while A pauses at draft: the public object ends absent
+ok 31 - F1 logic: withdrawal and its sync while A pauses at draft: the public object ends absent
+  ---
+  duration_ms: 3.597291
+  type: 'test'
+  ...
+# Subtest: F1 handler: withdrawal and its sync while A pauses at draft: the public object ends absent
+ok 32 - F1 handler: withdrawal and its sync while A pauses at draft: the public object ends absent
+  ---
+  duration_ms: 29.710376
+  type: 'test'
+  ...
+# Subtest: F1 logic: withdrawal and its sync while A pauses at upload: the public object ends absent
+ok 33 - F1 logic: withdrawal and its sync while A pauses at upload: the public object ends absent
+  ---
+  duration_ms: 0.530239
+  type: 'test'
+  ...
+# Subtest: F1 handler: withdrawal and its sync while A pauses at upload: the public object ends absent
+ok 34 - F1 handler: withdrawal and its sync while A pauses at upload: the public object ends absent
+  ---
+  duration_ms: 2.351935
+  type: 'test'
+  ...
+# Subtest: F1: an undisturbed sync places the file once and reports nothing pending
+ok 35 - F1: an undisturbed sync places the file once and reports nothing pending
+  ---
+  duration_ms: 0.928359
+  type: 'test'
+  ...
+# Subtest: F1: a refused fresh plan stops the sync before any upload
+ok 36 - F1: a refused fresh plan stops the sync before any upload
+  ---
+  duration_ms: 0.266481
+  type: 'test'
+  ...
+# Subtest: F1: removals that never succeed end after bounded rounds and stay reported as pending
+ok 37 - F1: removals that never succeed end after bounded rounds and stay reported as pending
+  ---
+  duration_ms: 0.344429
+  type: 'test'
+  ...
+# Subtest: parseBody accepts exactly the documented shapes
+ok 38 - parseBody accepts exactly the documented shapes
+  ---
+  duration_ms: 1.524808
+  type: 'test'
+  ...
+# Subtest: parseBody refuses unknown fields, bad values and forged identities
+ok 39 - parseBody refuses unknown fields, bad values and forged identities
+  ---
+  duration_ms: 1.088911
+  type: 'test'
+  ...
+# Subtest: the password limit counts UTF-8 bytes (bcrypt uses at most 72)
+ok 40 - the password limit counts UTF-8 bytes (bcrypt uses at most 72)
+  ---
+  duration_ms: 0.242626
+  type: 'test'
+  ...
+# Subtest: digestHex is the sha256 of the secret (what the device sent)
+ok 41 - digestHex is the sha256 of the secret (what the device sent)
+  ---
+  duration_ms: 12.440438
+  type: 'test'
+  ...
+# Subtest: Auth Admin results: only 2xx is applied, refusals are rejected, the rest unknown
+ok 42 - Auth Admin results: only 2xx is applied, refusals are rejected, the rest unknown
+  ---
+  duration_ms: 0.29201
+  type: 'test'
+  ...
+# Subtest: member outcomes never say more than the database decided
+ok 43 - member outcomes never say more than the database decided
+  ---
+  duration_ms: 0.200863
+  type: 'test'
+  ...
+# Subtest: key headers: a JWT key also authorizes, a new-format key only identifies
+ok 44 - key headers: a JWT key also authorizes, a new-format key only identifies
+  ---
+  duration_ms: 0.216887
+  type: 'test'
+  ...
+# Subtest: the system envelope carries no expected_revision and no actor
+ok 45 - the system envelope carries no expected_revision and no actor
+  ---
+  duration_ms: 0.175234
+  type: 'test'
+  ...
+# Subtest: leaks finds secrets in text
+ok 46 - leaks finds secrets in text
+  ---
+  duration_ms: 2.744547
+  type: 'test'
+  ...
+# Subtest: the function never logs or returns a body value
+ok 47 - the function never logs or returns a body value
+  ---
+  duration_ms: 2.266506
+  type: 'test'
+  ...
+# Subtest: a declared body over 4096 bytes (or a malformed length) is refused before reading
+ok 48 - a declared body over 4096 bytes (or a malformed length) is refused before reading
+  ---
+  duration_ms: 0.306151
+  type: 'test'
+  ...
+# Subtest: the function caps the bytes it reads and never buffers the whole body first
+ok 49 - the function caps the bytes it reads and never buffers the whole body first
+  ---
+  duration_ms: 0.243236
+  type: 'test'
+  ...
+# Subtest: the client IP is the first x-forwarded-for hop, else unknown (null)
+ok 50 - the client IP is the first x-forwarded-for hop, else unknown (null)
+  ---
+  duration_ms: 0.541576
+  type: 'test'
+  ...
+# Subtest: client keys are keyed hashes: same IP same key, other IP other key, one shared unknown key
+ok 51 - client keys are keyed hashes: same IP same key, other IP other key, one shared unknown key
+  ---
+  duration_ms: 12.754212
+  type: 'test'
+  ...
+# Subtest: the function never logs or returns the client IP
+ok 52 - the function never logs or returns the client IP
+  ---
+  duration_ms: 0.566203
+  type: 'test'
+  ...
+# Subtest: only {action: auth_delete, deletion_id} is accepted
+ok 53 - only {action: auth_delete, deletion_id} is accepted
+  ---
+  duration_ms: 2.538325
+  type: 'test'
+  ...
+# Subtest: the caller must present a well-formed system credential
+ok 54 - the caller must present a well-formed system credential
+  ---
+  duration_ms: 0.314584
+  type: 'test'
+  ...
+# Subtest: Auth Admin answers become claims; the database decides
+ok 55 - Auth Admin answers become claims; the database decides
+  ---
+  duration_ms: 0.332071
+  type: 'test'
+  ...
+# Subtest: the fence answer never passes an account id on
+ok 56 - the fence answer never passes an account id on
+  ---
+  duration_ms: 0.495707
+  type: 'test'
+  ...
+# Subtest: bodies, keys and envelopes
+ok 57 - bodies, keys and envelopes
+  ---
+  duration_ms: 0.446203
+  type: 'test'
+  ...
+# Subtest: the service account is the console JSON or its base64; anything else fails closed
+ok 58 - the service account is the console JSON or its base64; anything else fails closed
+  ---
+  duration_ms: 2.765828
+  type: 'test'
+  ...
+# Subtest: the provider URLs are Google's; only a local stack may use a fake endpoint
+ok 59 - the provider URLs are Google's; only a local stack may use a fake endpoint
+  ---
+  duration_ms: 0.342696
+  type: 'test'
+  ...
+# Subtest: the OAuth assertion is RS256-signed by the service account for the FCM scope
+ok 60 - the OAuth assertion is RS256-signed by the service account for the FCM scope
+  ---
+  duration_ms: 23.168737
+  type: 'test'
+  ...
+# Subtest: the message is generic: fixed text, the item id as data and stable notification id, expiring
+ok 61 - the message is generic: fixed text, the item id as data and stable notification id, expiring
+  ---
+  duration_ms: 0.458221
+  type: 'test'
+  ...
+# Subtest: FCM answers are classified; only answers about the token retire it
+ok 62 - FCM answers are classified; only answers about the token retire it
+  ---
+  duration_ms: 1.18788
+  type: 'test'
+  ...
+# Subtest: the sender gets one access token, caches it and sends with it
+ok 63 - the sender gets one access token, caches it and sends with it
+  ---
+  duration_ms: 3.559534
+  type: 'test'
+  ...
+# Subtest: provider failures: invalid token, quota, network, and our own configuration refused
+ok 64 - provider failures: invalid token, quota, network, and our own configuration refused
+  ---
+  duration_ms: 9.424564
+  type: 'test'
+  ...
+# Subtest: the body is empty, {} or {action: run, limit?}
+ok 65 - the body is empty, {} or {action: run, limit?}
+  ---
+  duration_ms: 2.929845
+  type: 'test'
+  ...
+# Subtest: the function needs both of its secrets well-formed (fail closed)
+ok 66 - the function needs both of its secrets well-formed (fail closed)
+  ---
+  duration_ms: 0.531341
+  type: 'test'
+  ...
+# Subtest: only the configured trigger starts a run, compared in constant time
+ok 67 - only the configured trigger starts a run, compared in constant time
+  ---
+  duration_ms: 0.223337
+  type: 'test'
+  ...
+# Subtest: Content retention dispatch uses only the existing trigger and bounded count payload
+ok 68 - Content retention dispatch uses only the existing trigger and bounded count payload
+  ---
+  duration_ms: 0.647386
+  type: 'test'
+  ...
+# Subtest: Content retention dispatch reports only coarse auth and availability outcomes
+ok 69 - Content retention dispatch reports only coarse auth and availability outcomes
+  ---
+  duration_ms: 0.215495
+  type: 'test'
+  ...
+# Subtest: size, key headers and the envelope
+ok 70 - size, key headers and the envelope
+  ---
+  duration_ms: 0.29222
+  type: 'test'
+  ...
+# Subtest: a claim answer is checked strictly
+ok 71 - a claim answer is checked strictly
+  ---
+  duration_ms: 0.501636
+  type: 'test'
+  ...
+# Subtest: the run deadline stops one call plus a margin before the lease ends
+ok 72 - the run deadline stops one call plus a margin before the lease ends
+  ---
+  duration_ms: 0.161793
+  type: 'test'
+  ...
+# Subtest: a run claims, then attempts each job with its own token, and reports counts only
+ok 73 - a run claims, then attempts each job with its own token, and reports counts only
+  ---
+  duration_ms: 1.040598
+  type: 'test'
+  ...
+# Subtest: jobs past the deadline are released unused (a failed release just lapses)
+ok 74 - jobs past the deadline are released unused (a failed release just lapses)
+  ---
+  duration_ms: 0.745704
+  type: 'test'
+  ...
+# Subtest: a refused or malformed claim fails the run
+ok 75 - a refused or malformed claim fails the run
+  ---
+  duration_ms: 0.684041
+  type: 'test'
+  ...
+# Subtest: claim and prepare answers are checked strictly; nothing malformed is sent
+ok 76 - claim and prepare answers are checked strictly; nothing malformed is sent
+  ---
+  duration_ms: 3.470861
+  type: 'test'
+  ...
+# Subtest: a run prepares, sends to every target and records per-device answers (counts only)
+ok 77 - a run prepares, sends to every target and records per-device answers (counts only)
+  ---
+  duration_ms: 1.020678
+  type: 'test'
+  ...
+# Subtest: quota stops sending: the rest of the batch is released unused
+ok 78 - quota stops sending: the rest of the batch is released unused
+  ---
+  duration_ms: 0.357949
+  type: 'test'
+  ...
+# Subtest: our configuration refused (OAuth, own token, sender mismatch): released unused, the run stops
+ok 79 - our configuration refused (OAuth, own token, sender mismatch): released unused, the run stops
+  ---
+  duration_ms: 0.905895
+  type: 'test'
+  ...
+# Subtest: a provider outage stops the run after a few transient answers
+ok 80 - a provider outage stops the run after a few transient answers
+  ---
+  duration_ms: 0.643239
+  type: 'test'
+  ...
+# Subtest: sends stop before the lease ends; what was sent is recorded under the lease
+ok 81 - sends stop before the lease ends; what was sent is recorded under the lease
+  ---
+  duration_ms: 0.45802
+  type: 'test'
+  ...
+# Subtest: a lost system answer is uncertain; the deadline defers the rest
+ok 82 - a lost system answer is uncertain; the deadline defers the rest
+  ---
+  duration_ms: 0.417799
+  type: 'test'
+  ...
+# Subtest: a refused claim fails the run before anything is sent
+ok 83 - a refused claim fails the run before anything is sent
+  ---
+  duration_ms: 0.459392
+  type: 'test'
+  ...
+# Subtest: push off: the claim is made but leases nothing, so nothing is sent
+ok 84 - push off: the claim is made but leases nothing, so nothing is sent
+  ---
+  duration_ms: 0.566684
+  type: 'test'
+  ...
+# Subtest: no FCM credential: push jobs still expire (expire-only claim, nothing leased)
+ok 85 - no FCM credential: push jobs still expire (expire-only claim, nothing leased)
+  ---
+  duration_ms: 0.708287
+  type: 'test'
+  ...
+# Subtest: story 3.8: a closed outbound gate is a deliberate pause, never `unexpected`
+ok 86 - story 3.8: a closed outbound gate is a deliberate pause, never `unexpected`
+  ---
+  duration_ms: 1.401061
+  type: 'test'
+  ...
+# Subtest: scrub redacts secret keys at any depth and token-shaped strings
+ok 87 - scrub redacts secret keys at any depth and token-shaped strings
+  ---
+  duration_ms: 2.095749
+  type: 'test'
+  ...
+# Subtest: summarizeJwt keeps header and trust claims, digests ids, drops identifiers
+ok 88 - summarizeJwt keeps header and trust claims, digests ids, drops identifiers
+  ---
+  duration_ms: 1.615645
+  type: 'test'
+  ...
+# Subtest: summarizeSession never carries the raw tokens
+ok 89 - summarizeSession never carries the raw tokens
+  ---
+  duration_ms: 0.805784
+  type: 'test'
+  ...
+# Subtest: amrHasPassword: only an explicit password entry is trusted
+ok 90 - amrHasPassword: only an explicit password entry is trusted
+  ---
+  duration_ms: 0.226822
+  type: 'test'
+  ...
+# Subtest: parseVerifyLink extracts token/type/redirect and rejects other URLs
+ok 91 - parseVerifyLink extracts token/type/redirect and rejects other URLs
+  ---
+  duration_ms: 0.748598
+  type: 'test'
+  ...
+# Subtest: parseRedirectLocation distinguishes session, error, pkce and empty redirects
+ok 92 - parseRedirectLocation distinguishes session, error, pkce and empty redirects
+  ---
+  duration_ms: 0.342206
+  type: 'test'
+  ...
+# Subtest: maskIdentifier keeps only plus-tag or last digits
+ok 93 - maskIdentifier keeps only plus-tag or last digits
+  ---
+  duration_ms: 0.274093
+  type: 'test'
+  ...
+# Subtest: assertAllowedOrigin accepts only https://<auth-test ref>.supabase.co
+ok 94 - assertAllowedOrigin accepts only https://<auth-test ref>.supabase.co
+  ---
+  duration_ms: 0.649639
+  type: 'test'
+  ...
+# Subtest: AuthClient refuses any other project before sending a request
+ok 95 - AuthClient refuses any other project before sending a request
+  ---
+  duration_ms: 0.526654
+  type: 'test'
+  ...
+# Subtest: parseVerifyLink rejects look-alike link hosts and paths
+ok 96 - parseVerifyLink rejects look-alike link hosts and paths
+  ---
+  duration_ms: 0.570129
+  type: 'test'
+  ...
+# Subtest: harnessTarget is local only for HARNESS_TARGET=local exactly
+ok 97 - harnessTarget is local only for HARNESS_TARGET=local exactly
+  ---
+  duration_ms: 0.209105
+  type: 'test'
+  ...
+# Subtest: local target accepts exactly http://127.0.0.1:54321 and never the hosted project
+ok 98 - local target accepts exactly http://127.0.0.1:54321 and never the hosted project
+  ---
+  duration_ms: 0.536028
+  type: 'test'
+  ...
+# Subtest: summarizeSignup reports an error body only as error, never as user
+ok 99 - summarizeSignup reports an error body only as error, never as user
+  ---
+  duration_ms: 0.289657
+  type: 'test'
+  ...
+# Subtest: reads project_id from config.toml
+ok 100 - reads project_id from config.toml
+  ---
+  duration_ms: 1.271706
+  type: 'test'
+  ...
+# Subtest: the CLI defaults carry no SMS route
+ok 101 - the CLI defaults carry no SMS route
+  ---
+  duration_ms: 1.867595
+  type: 'test'
+  ...
+# Subtest: any SMS provider, credential, hook, test OTP or phone MFA is refused
+ok 102 - any SMS provider, credential, hook, test OTP or phone MFA is refused
+  ---
+  duration_ms: 0.397449
+  type: 'test'
+  ...
+# Subtest: on changes exactly the phone switch and autoconfirm
+ok 103 - on changes exactly the phone switch and autoconfirm
+  ---
+  duration_ms: 0.486914
+  type: 'test'
+  ...
+# Subtest: off restores the captured CLI values exactly, including unset keys
+ok 104 - off restores the captured CLI values exactly, including unset keys
+  ---
+  duration_ms: 0.385521
+  type: 'test'
+  ...
+# Subtest: function serves only its own project URL
+ok 105 - function serves only its own project URL
+  ---
+  duration_ms: 1.480922
+  type: 'test'
+  ...
+# Subtest: requests naming another project or URL are refused
+ok 106 - requests naming another project or URL are refused
+  ---
+  duration_ms: 0.479703
+  type: 'test'
+  ...
+# Subtest: caller classification accepts only own anon key or own user sessions
+ok 107 - caller classification accepts only own anon key or own user sessions
+  ---
+  duration_ms: 0.481746
+  type: 'test'
+  ...
+# Subtest: member and operator actions need the anon key; staff actions need a user session
+ok 108 - member and operator actions need the anon key; staff actions need a user session
+  ---
+  duration_ms: 1.064995
+  type: 'test'
+  ...
+# Subtest: provisioning only ever targets owner-approved synthetic plus-addresses
+ok 109 - provisioning only ever targets owner-approved synthetic plus-addresses
+  ---
+  duration_ms: 0.753746
+  type: 'test'
+  ...
+# Subtest: the function reports Auth facts only; the DB decides success
+ok 110 - the function reports Auth facts only; the DB decides success
+  ---
+  duration_ms: 0.392011
+  type: 'test'
+  ...
+# Subtest: Auth calls time out instead of hanging (reported as lost, i.e. uncertain)
+ok 111 - Auth calls time out instead of hanging (reported as lost, i.e. uncertain)
+  ---
+  duration_ms: 51.207373
+  type: 'test'
+  ...
+# Subtest: instrumented deletion only targets synthetic plus-addresses
+ok 112 - instrumented deletion only targets synthetic plus-addresses
+  ---
+  duration_ms: 0.49773
+  type: 'test'
+  ...
+# Subtest: function and harness compute the same grant digest
+ok 113 - function and harness compute the same grant digest
+  ---
+  duration_ms: 3.426734
+  type: 'test'
+  ...
+# Subtest: grant secrets, operator tokens and grant fields never survive redaction
+ok 114 - grant secrets, operator tokens and grant fields never survive redaction
+  ---
+  duration_ms: 0.952014
+  type: 'test'
+  ...
+# Subtest: evidence ids are digests, never raw UUIDs
+ok 115 - evidence ids are digests, never raw UUIDs
+  ---
+  duration_ms: 0.623249
+  type: 'test'
+  ...
+# Subtest: committed scenarios only use the r13 synthetic accounts and known commands
+ok 116 - committed scenarios only use the r13 synthetic accounts and known commands
+  ---
+  duration_ms: 10.494395
+  type: 'test'
+  ...
+# Subtest: every committed scenario masks the owner mailbox as <inbox>
+ok 117 - every committed scenario masks the owner mailbox as <inbox>
+  ---
+  duration_ms: 2.359176
+  type: 'test'
+  ...
+# Subtest: Story 3.10 personal-data scan rejects identifiers and contact details
+ok 118 - Story 3.10 personal-data scan rejects identifiers and contact details
+  ---
+  duration_ms: 1243.664059
+  type: 'test'
+  ...
+# Subtest: Story 3.10 personal-data scan keeps product vocabulary clean
+ok 119 - Story 3.10 personal-data scan keeps product vocabulary clean
+  ---
+  duration_ms: 54.820605
+  type: 'test'
+  ...
+# Subtest: a missing path, an unknown flag or a flag in second position never reports clean
+ok 120 - a missing path, an unknown flag or a flag in second position never reports clean
+  ---
+  duration_ms: 90.56518
+  type: 'test'
+  ...
+# Subtest: a small printed book becomes hymns and choruses with sections, keys and choruses
+ok 121 - a small printed book becomes hymns and choruses with sections, keys and choruses
+  ---
+  duration_ms: 5.518497
+  type: 'test'
+  ...
+# Subtest: a chorus first printed after a later verse is shown from that verse on, with a note
+ok 122 - a chorus first printed after a later verse is shown from that verse on, with a note
+  ---
+  duration_ms: 6.089598
+  type: 'test'
+  ...
+# Subtest: an English title printed both on the heading and under it is a problem, not a silent choice
+ok 123 - an English title printed both on the heading and under it is a problem, not a silent choice
+  ---
+  duration_ms: 0.832284
+  type: 'test'
+  ...
+# Subtest: a one-line verse 1 completed by verse 2 is noted for the printed book check
+ok 124 - a one-line verse 1 completed by verse 2 is noted for the printed book check
+  ---
+  duration_ms: 0.695478
+  type: 'test'
+  ...
+# Subtest: reviewed corrections apply only to the exact extracted line
+ok 125 - reviewed corrections apply only to the exact extracted line
+  ---
+  duration_ms: 4.97021
+  type: 'test'
+  ...
+# Subtest: a manuscript with a gap, a repeated number, an empty verse and a stray line is refused
+ok 126 - a manuscript with a gap, a repeated number, an empty verse and a stray line is refused
+  ---
+  duration_ms: 0.73598
+  type: 'test'
+  ...
+# Subtest: titles are checked against the indexes; larger differences need an explanation
+ok 127 - titles are checked against the indexes; larger differences need an explanation
+  ---
+  duration_ms: 3.213273
+  type: 'test'
+  ...
+# Subtest: the book stores apostrophes the fonts carry and keys as words
+ok 128 - the book stores apostrophes the fonts carry and keys as words
+  ---
+  duration_ms: 0.729539
+  type: 'test'
+  ...
+# Subtest: the church hymn book: 199 hymns and 67 choruses from the pinned PDF, with no problems
+ok 129 - the church hymn book: 199 hymns and 67 choruses from the pinned PDF, with no problems
+  ---
+  duration_ms: 66.409975
+  type: 'test'
+  ...
+# Subtest: the command line checks, writes, and refuses a faulty book without writing
+ok 130 - the command line checks, writes, and refuses a faulty book without writing
+  ---
+  duration_ms: 49.098936
+  type: 'test'
+  ...
+# Subtest: a deletion runs to completion, journaling each entry once before the steps it guards
+ok 131 - a deletion runs to completion, journaling each entry once before the steps it guards
+  ---
+  duration_ms: 13.409498
+  type: 'test'
+  ...
+# Subtest: interrupted after an append and before its ack: the resumed run acks the existing entry
+ok 132 - interrupted after an append and before its ack: the resumed run acks the existing entry
+  ---
+  duration_ms: 3.16515
+  type: 'test'
+  ...
+# Subtest: entries other writers appended after the database head are caught up first, in order
+ok 133 - entries other writers appended after the database head are caught up first, in order
+  ---
+  duration_ms: 3.033642
+  type: 'test'
+  ...
+# Subtest: a waiting step stops the run with its reason; a refused ack stops it as failed
+ok 134 - a waiting step stops the run with its reason; a refused ack stops it as failed
+  ---
+  duration_ms: 2.648892
+  type: 'test'
+  ...
+# Subtest: only opaque journal fields are accepted from the database
+ok 135 - only opaque journal fields are accepted from the database
+  ---
+  duration_ms: 0.607646
+  type: 'test'
+  ...
+# Subtest: the clients send the credential only as a header and never a service key
+ok 136 - the clients send the credential only as a header and never a service key
+  ---
+  duration_ms: 1.206218
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 137 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.954899
+  type: 'test'
+  ...
+# Subtest: a chooser option may carry only the safe projection keys
+ok 138 - a chooser option may carry only the safe projection keys
+  ---
+  duration_ms: 0.871002
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 139 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.032987
+  type: 'test'
+  ...
+# Subtest: a grant secret has the device format and its digest is sha256 hex
+ok 140 - a grant secret has the device format and its digest is sha256 hex
+  ---
+  duration_ms: 1.038646
+  type: 'test'
+  ...
+# Subtest: the leak scan finds secrets and ignores short values
+ok 141 - the leak scan finds secrets and ignores short values
+  ---
+  duration_ms: 0.823
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 142 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.81592
+  type: 'test'
+  ...
+# Subtest: everything it creates is synthetic
+ok 143 - everything it creates is synthetic
+  ---
+  duration_ms: 0.620265
+  type: 'test'
+  ...
+# Subtest: the first meeting weekday is two church days ahead
+ok 144 - the first meeting weekday is two church days ahead
+  ---
+  duration_ms: 0.181854
+  type: 'test'
+  ...
+# Subtest: only own meetings inside the window pass
+ok 145 - only own meetings inside the window pass
+  ---
+  duration_ms: 0.530319
+  type: 'test'
+  ...
+# Subtest: meeting keys are collected across meetings
+ok 146 - meeting keys are collected across meetings
+  ---
+  duration_ms: 0.168845
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 147 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.983733
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 148 - the cells are synthetic
+  ---
+  duration_ms: 0.279051
+  type: 'test'
+  ...
+# Subtest: it names the run and every Cells table through story 5.9
+ok 149 - it names the run and every Cells table through story 5.9
+  ---
+  duration_ms: 1.118445
+  type: 'test'
+  ...
+# Subtest: it refuses anything but SYNTHETIC names, uuids and phone numbers
+ok 150 - it refuses anything but SYNTHETIC names, uuids and phone numbers
+  ---
+  duration_ms: 0.365371
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 151 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.078044
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 152 - the cells are synthetic
+  ---
+  duration_ms: 0.290127
+  type: 'test'
+  ...
+# Subtest: a shift takes a meeting id and whole days only
+ok 153 - a shift takes a meeting id and whole days only
+  ---
+  duration_ms: 0.452833
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 154 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.927218
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 155 - the cells are synthetic
+  ---
+  duration_ms: 0.239441
+  type: 'test'
+  ...
+# Subtest: the first meeting falls three church days ahead (ISO weekday, Monday = 1)
+ok 156 - the first meeting falls three church days ahead (ISO weekday, Monday = 1)
+  ---
+  duration_ms: 0.254183
+  type: 'test'
+  ...
+# Subtest: a reminder offset is read in whole hours before the start
+ok 157 - a reminder offset is read in whole hours before the start
+  ---
+  duration_ms: 0.162214
+  type: 'test'
+  ...
+# Subtest: payload scan finds a venue or name anywhere in the value
+ok 158 - payload scan finds a venue or name anywhere in the value
+  ---
+  duration_ms: 0.147142
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 159 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.027678
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 160 - the cells are synthetic
+  ---
+  duration_ms: 0.202976
+  type: 'test'
+  ...
+# Subtest: meeting ids are read per cell and compared by occurrence date
+ok 161 - meeting ids are read per cell and compared by occurrence date
+  ---
+  duration_ms: 1.056032
+  type: 'test'
+  ...
+# Subtest: the first meeting falls two church days ahead (ISO weekday, Monday = 1)
+ok 162 - the first meeting falls two church days ahead (ISO weekday, Monday = 1)
+  ---
+  duration_ms: 0.214202
+  type: 'test'
+  ...
+# Subtest: church clock reads Lusaka time
+ok 163 - church clock reads Lusaka time
+  ---
+  duration_ms: 0.421005
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 164 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.962932
+  type: 'test'
+  ...
+# Subtest: the pilot cells are the synthetic stand-ins
+ok 165 - the pilot cells are the synthetic stand-ins
+  ---
+  duration_ms: 0.288575
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 166 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.997203
+  type: 'test'
+  ...
+# Subtest: the cells and the department are synthetic
+ok 167 - the cells and the department are synthetic
+  ---
+  duration_ms: 0.207603
+  type: 'test'
+  ...
+# Subtest: a member read leaking a private field is caught
+ok 168 - a member read leaking a private field is caught
+  ---
+  duration_ms: 0.284008
+  type: 'test'
+  ...
+# Subtest: the published copy compares to the preview without its publication fields
+ok 169 - the published copy compares to the preview without its publication fields
+  ---
+  duration_ms: 0.765654
+  type: 'test'
+  ...
+# Subtest: part states read the owned position, the link, or open
+ok 170 - part states read the owned position, the link, or open
+  ---
+  duration_ms: 0.182886
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 171 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.040609
+  type: 'test'
+  ...
+# Subtest: the cells and the department are synthetic
+ok 172 - the cells and the department are synthetic
+  ---
+  duration_ms: 0.339371
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 173 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.968239
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 174 - the cells are synthetic
+  ---
+  duration_ms: 0.76348
+  type: 'test'
+  ...
+# Subtest: a part carries its id only when it has one
+ok 175 - a part carries its id only when it has one
+  ---
+  duration_ms: 0.873676
+  type: 'test'
+  ...
+# Subtest: part refusals are read per index, other field errors ignored
+ok 176 - part refusals are read per index, other field errors ignored
+  ---
+  duration_ms: 0.328885
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 177 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 2.170777
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 178 - the cells are synthetic
+  ---
+  duration_ms: 0.329607
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 179 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 2.792379
+  type: 'test'
+  ...
+# Subtest: the cells are synthetic
+ok 180 - the cells are synthetic
+  ---
+  duration_ms: 0.295756
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 181 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.139267
+  type: 'test'
+  ...
+# Subtest: a single primary cell means the read names exactly that cell
+ok 182 - a single primary cell means the read names exactly that cell
+  ---
+  duration_ms: 0.254724
+  type: 'test'
+  ...
+# Subtest: a hook call is in the same transaction when its row xmin equals the membership row xmin
+ok 183 - a hook call is in the same transaction when its row xmin equals the membership row xmin
+  ---
+  duration_ms: 0.16631
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 184 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.064294
+  type: 'test'
+  ...
+# Subtest: the announcements are synthetic
+ok 185 - the announcements are synthetic
+  ---
+  duration_ms: 0.373733
+  type: 'test'
+  ...
+# Subtest: the notice text is the generic contract text, without the announcement
+ok 186 - the notice text is the generic contract text, without the announcement
+  ---
+  duration_ms: 0.20608
+  type: 'test'
+  ...
+# Subtest: the public projection keys are compared sorted
+ok 187 - the public projection keys are compared sorted
+  ---
+  duration_ms: 2.404695
+  type: 'test'
+  ...
+# Subtest: titles come in the order of the read
+ok 188 - titles come in the order of the read
+  ---
+  duration_ms: 0.280743
+  type: 'test'
+  ...
+# Subtest: leaks names only the values found
+ok 189 - leaks names only the values found
+  ---
+  duration_ms: 0.199361
+  type: 'test'
+  ...
+# Subtest: device tokens are synthetic and distinct
+ok 190 - device tokens are synthetic and distinct
+  ---
+  duration_ms: 0.488285
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional block +44 7700 900501-900509 is used
+ok 191 - only the reserved fictional block +44 7700 900501-900509 is used
+  ---
+  duration_ms: 1.044134
+  type: 'test'
+  ...
+# Subtest: the generated images are real PNGs the function measures
+ok 192 - the generated images are real PNGs the function measures
+  ---
+  duration_ms: 70.92571
+  type: 'test'
+  ...
+# Subtest: names are SYNTHETIC and the public projection keys are sorted
+ok 193 - names are SYNTHETIC and the public projection keys are sorted
+  ---
+  duration_ms: 0.309276
+  type: 'test'
+  ...
+# Subtest: the local fixture uses only its reserved synthetic phone numbers
+ok 194 - the local fixture uses only its reserved synthetic phone numbers
+  ---
+  duration_ms: 2.496963
+  type: 'test'
+  ...
+# Subtest: Bible E2E data contains only clearly marked synthetic verses
+ok 195 - Bible E2E data contains only clearly marked synthetic verses
+  ---
+  duration_ms: 1.489664
+  type: 'test'
+  ...
+# Subtest: canonical order includes all 66 Protestant books once
+ok 196 - canonical order includes all 66 Protestant books once
+  ---
+  duration_ms: 0.300393
+  type: 'test'
+  ...
+# Subtest: available chapter navigation sorts canonically without mutating the projection
+ok 197 - available chapter navigation sorts canonically without mutating the projection
+  ---
+  duration_ms: 0.487896
+  type: 'test'
+  ...
+# Subtest: the anonymous chapter projection stays explicit and has no private fields
+ok 198 - the anonymous chapter projection stays explicit and has no private fields
+  ---
+  duration_ms: 0.295525
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional block +44 7700 900291-900299 is used
+ok 199 - only the reserved fictional block +44 7700 900291-900299 is used
+  ---
+  duration_ms: 1.415042
+  type: 'test'
+  ...
+# Subtest: names are SYNTHETIC and the count read carries counts only
+ok 200 - names are SYNTHETIC and the count read carries counts only
+  ---
+  duration_ms: 0.960588
+  type: 'test'
+  ...
+# Subtest: a duty, rota, department or review key anywhere is caught
+ok 201 - a duty, rota, department or review key anywhere is caught
+  ---
+  duration_ms: 0.440694
+  type: 'test'
+  ...
+# Subtest: answers, refusals and the board lookup
+ok 202 - answers, refusals and the board lookup
+  ---
+  duration_ms: 0.273953
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional block +44 7700 900584-900598 is used
+ok 203 - only the reserved fictional block +44 7700 900584-900598 is used
+  ---
+  duration_ms: 0.923873
+  type: 'test'
+  ...
+# Subtest: a race tally counts going, full and anything else
+ok 204 - a race tally counts going, full and anything else
+  ---
+  duration_ms: 0.619794
+  type: 'test'
+  ...
+# Subtest: names are SYNTHETIC and the public keys are sorted, counts only
+ok 205 - names are SYNTHETIC and the public keys are sorted, counts only
+  ---
+  duration_ms: 0.579443
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 206 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.872545
+  type: 'test'
+  ...
+# Subtest: the event is synthetic
+ok 207 - the event is synthetic
+  ---
+  duration_ms: 0.219431
+  type: 'test'
+  ...
+# Subtest: church days are Lusaka days (UTC+2)
+ok 208 - church days are Lusaka days (UTC+2)
+  ---
+  duration_ms: 0.443959
+  type: 'test'
+  ...
+# Subtest: the public projection keys are compared sorted
+ok 209 - the public projection keys are compared sorted
+  ---
+  duration_ms: 0.640455
+  type: 'test'
+  ...
+# Subtest: church-authored public events declare offline eligibility
+ok 210 - church-authored public events declare offline eligibility
+  ---
+  duration_ms: 0.138509
+  type: 'test'
+  ...
+# Subtest: an event is found by id in a list read
+ok 211 - an event is found by id in a list read
+  ---
+  duration_ms: 0.237948
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 212 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.844483
+  type: 'test'
+  ...
+# Subtest: every method is a SAMPLE, as the q3 fixture requires
+ok 213 - every method is a SAMPLE, as the q3 fixture requires
+  ---
+  duration_ms: 0.25845
+  type: 'test'
+  ...
+# Subtest: the payloads carry no amount or payer field and none of the prototype values
+ok 214 - the payloads carry no amount or payer field and none of the prototype values
+  ---
+  duration_ms: 0.299001
+  type: 'test'
+  ...
+# Subtest: a save payload drops the type and names the method
+ok 215 - a save payload drops the type and names the method
+  ---
+  duration_ms: 0.15226
+  type: 'test'
+  ...
+# Subtest: church dates are Lusaka dates (UTC+2)
+ok 216 - church dates are Lusaka dates (UTC+2)
+  ---
+  duration_ms: 0.465722
+  type: 'test'
+  ...
+# Subtest: the public projection keys are compared sorted
+ok 217 - the public projection keys are compared sorted
+  ---
+  duration_ms: 0.665423
+  type: 'test'
+  ...
+# Subtest: a method and its copyable values are found by key
+ok 218 - a method and its copyable values are found by key
+  ---
+  duration_ms: 0.239591
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 219 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.912515
+  type: 'test'
+  ...
+# Subtest: the run names the built-in edition
+ok 220 - the run names the built-in edition
+  ---
+  duration_ms: 0.116286
+  type: 'test'
+  ...
+# Subtest: this Sunday is the church-time Sunday (Africa/Lusaka, UTC+2)
+ok 221 - this Sunday is the church-time Sunday (Africa/Lusaka, UTC+2)
+  ---
+  duration_ms: 0.514055
+  type: 'test'
+  ...
+# Subtest: saved items are compared sorted and tolerate a refused read
+ok 222 - saved items are compared sorted and tolerate a refused read
+  ---
+  duration_ms: 0.617591
+  type: 'test'
+  ...
+# Subtest: the public projection keys are compared sorted
+ok 223 - the public projection keys are compared sorted
+  ---
+  duration_ms: 0.157437
+  type: 'test'
+  ...
+# Subtest: retention E2E verdict requires both metadata and Storage object removal
+ok 224 - retention E2E verdict requires both metadata and Storage object removal
+  ---
+  duration_ms: 1.020437
+  type: 'test'
+  ...
+# Subtest: partial or inconsistent deletion does not count as success
+ok 225 - partial or inconsistent deletion does not count as success
+  ---
+  duration_ms: 0.153141
+  type: 'test'
+  ...
+# Subtest: only this run accepts its four reserved fictional UK phones
+ok 226 - only this run accepts its four reserved fictional UK phones
+  ---
+  duration_ms: 1.248071
+  type: 'test'
+  ...
+# Subtest: the search word is one plain word
+ok 227 - the search word is one plain word
+  ---
+  duration_ms: 0.204068
+  type: 'test'
+  ...
+# Subtest: a search answer has exactly five keys and lists of at most ten
+ok 228 - a search answer has exactly five keys and lists of at most ten
+  ---
+  duration_ms: 2.503583
+  type: 'test'
+  ...
+# Subtest: leaks names only what is present
+ok 229 - leaks names only what is present
+  ---
+  duration_ms: 0.184007
+  type: 'test'
+  ...
+# Subtest: church instants are whole UTC hours two hours behind Lusaka
+ok 230 - church instants are whole UTC hours two hours behind Lusaka
+  ---
+  duration_ms: 2.170912
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional block +44 7700 900116-900121 is used
+ok 231 - only the reserved fictional block +44 7700 900116-900121 is used
+  ---
+  duration_ms: 0.780767
+  type: 'test'
+  ...
+# Subtest: names are SYNTHETIC and the reads carry no person
+ok 232 - names are SYNTHETIC and the reads carry no person
+  ---
+  duration_ms: 1.104655
+  type: 'test'
+  ...
+# Subtest: a sender anywhere is caught
+ok 233 - a sender anywhere is caught
+  ---
+  duration_ms: 0.487214
+  type: 'test'
+  ...
+# Subtest: answers and refusals
+ok 234 - answers and refusals
+  ---
+  duration_ms: 0.227824
+  type: 'test'
+  ...
+# Subtest: only this run accepts its four reserved fictional UK phones
+ok 235 - only this run accepts its four reserved fictional UK phones
+  ---
+  duration_ms: 1.083133
+  type: 'test'
+  ...
+# Subtest: fixture input is synthetic and carries one video source at most
+ok 236 - fixture input is synthetic and carries one video source at most
+  ---
+  duration_ms: 0.332671
+  type: 'test'
+  ...
+# Subtest: every accepted link normalises to the stored https://www.facebook.com or fb.watch form
+ok 237 - every accepted link normalises to the stored https://www.facebook.com or fb.watch form
+  ---
+  duration_ms: 0.393814
+  type: 'test'
+  ...
+# Subtest: the refused corpus covers other hosts, malformed links and the page live address
+ok 238 - the refused corpus covers other hosts, malformed links and the page live address
+  ---
+  duration_ms: 0.932826
+  type: 'test'
+  ...
+# Subtest: the public sermon projection names the Facebook link
+ok 239 - the public sermon projection names the Facebook link
+  ---
+  duration_ms: 0.195835
+  type: 'test'
+  ...
+# Subtest: only this run accepts its six reserved fictional UK phones
+ok 240 - only this run accepts its six reserved fictional UK phones
+  ---
+  duration_ms: 0.966296
+  type: 'test'
+  ...
+# Subtest: fixture names, speakers and body are synthetic and the video remains optional
+ok 241 - fixture names, speakers and body are synthetic and the video remains optional
+  ---
+  duration_ms: 0.334845
+  type: 'test'
+  ...
+# Subtest: the exact public projection key sets are sorted
+ok 242 - the exact public projection key sets are sorted
+  ---
+  duration_ms: 2.290257
+  type: 'test'
+  ...
+# Subtest: the public catalog guard checks empty and nonempty canonical responses
+ok 243 - the public catalog guard checks empty and nonempty canonical responses
+  ---
+  duration_ms: 0.391279
+  type: 'test'
+  ...
+# Subtest: a withdrawn series can disappear while its public sermon remains
+ok 244 - a withdrawn series can disappear while its public sermon remains
+  ---
+  duration_ms: 0.506824
+  type: 'test'
+  ...
+# Subtest: private or extra fields are caught at each nesting level
+ok 245 - private or extra fields are caught at each nesting level
+  ---
+  duration_ms: 0.217528
+  type: 'test'
+  ...
+# Subtest: unsafe notes corpus covers HTML, images, unsafe schemes, hosts and unsupported link forms
+ok 246 - unsafe notes corpus covers HTML, images, unsafe schemes, hosts and unsupported link forms
+  ---
+  duration_ms: 0.306242
+  type: 'test'
+  ...
+# Subtest: leak detection returns only present nonempty strings
+ok 247 - leak detection returns only present nonempty strings
+  ---
+  duration_ms: 0.203937
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 248 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.082632
+  type: 'test'
+  ...
+# Subtest: the member read may not carry a reason for the review
+ok 249 - the member read may not carry a reason for the review
+  ---
+  duration_ms: 0.911864
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 250 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.841248
+  type: 'test'
+  ...
+# Subtest: a journal entry is opaque: its kind's fields only, and no forbidden value
+ok 251 - a journal entry is opaque: its kind's fields only, and no forbidden value
+  ---
+  duration_ms: 1.757329
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 252 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.841959
+  type: 'test'
+  ...
+# Subtest: the departments are synthetic stand-ins
+ok 253 - the departments are synthetic stand-ins
+  ---
+  duration_ms: 0.365791
+  type: 'test'
+  ...
+# Subtest: only the exact generic text of a kind passes
+ok 254 - only the exact generic text of a kind passes
+  ---
+  duration_ms: 0.558111
+  type: 'test'
+  ...
+# Subtest: anything private in a coverage answer is caught
+ok 255 - anything private in a coverage answer is caught
+  ---
+  duration_ms: 0.45101
+  type: 'test'
+  ...
+# Subtest: positions are found by assignment or slot
+ok 256 - positions are found by assignment or slot
+  ---
+  duration_ms: 0.269666
+  type: 'test'
+  ...
+# Subtest: the pending summary is order independent
+ok 257 - the pending summary is order independent
+  ---
+  duration_ms: 0.243888
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 258 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.846486
+  type: 'test'
+  ...
+# Subtest: the departments are synthetic stand-ins
+ok 259 - the departments are synthetic stand-ins
+  ---
+  duration_ms: 0.168895
+  type: 'test'
+  ...
+# Subtest: the review notice is generic and opens the board reviews
+ok 260 - the review notice is generic and opens the board reviews
+  ---
+  duration_ms: 0.171458
+  type: 'test'
+  ...
+# Subtest: a vacancy reason is one of three coarse codes or nothing
+ok 261 - a vacancy reason is one of three coarse codes or nothing
+  ---
+  duration_ms: 0.579493
+  type: 'test'
+  ...
+# Subtest: coverage positions and the newest board history entry are found
+ok 262 - coverage positions and the newest board history entry are found
+  ---
+  duration_ms: 7.043796
+  type: 'test'
+  ...
+# Subtest: done and refused read the command envelope
+ok 263 - done and refused read the command envelope
+  ---
+  duration_ms: 0.210758
+  type: 'test'
+  ...
+# Subtest: owner calls are built for a named function only, with the caller claims as data
+ok 264 - owner calls are built for a named function only, with the caller claims as data
+  ---
+  duration_ms: 0.494225
+  type: 'test'
+  ...
+# Subtest: church ten is 08:00 UTC (Africa/Lusaka, UTC+2)
+ok 265 - church ten is 08:00 UTC (Africa/Lusaka, UTC+2)
+  ---
+  duration_ms: 0.998234
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 266 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.327584
+  type: 'test'
+  ...
+# Subtest: the departments are synthetic stand-ins
+ok 267 - the departments are synthetic stand-ins
+  ---
+  duration_ms: 0.316318
+  type: 'test'
+  ...
+# Subtest: a lifecycle reason anywhere in an answer is caught
+ok 268 - a lifecycle reason anywhere in an answer is caught
+  ---
+  duration_ms: 0.330329
+  type: 'test'
+  ...
+# Subtest: coverage positions and counts are found
+ok 269 - coverage positions and counts are found
+  ---
+  duration_ms: 0.230247
+  type: 'test'
+  ...
+# Subtest: a command went through only without a refusal code
+ok 270 - a command went through only without a refusal code
+  ---
+  duration_ms: 0.253153
+  type: 'test'
+  ...
+# Subtest: church 10:00 is 08:00 UTC (Africa/Lusaka, no daylight saving)
+ok 271 - church 10:00 is 08:00 UTC (Africa/Lusaka, no daylight saving)
+  ---
+  duration_ms: 0.152901
+  type: 'test'
+  ...
+# Subtest: a JSON literal is dollar-quoted and refuses its own tag
+ok 272 - a JSON literal is dollar-quoted and refuses its own tag
+  ---
+  duration_ms: 0.477451
+  type: 'test'
+  ...
+# Subtest: session claims are read from the token without verifying it
+ok 273 - session claims are read from the token without verifying it
+  ---
+  duration_ms: 0.98702
+  type: 'test'
+  ...
+# Subtest: a held command runs as the caller in its own transaction and sleeps before committing
+ok 274 - a held command runs as the caller in its own transaction and sleeps before committing
+  ---
+  duration_ms: 0.583381
+  type: 'test'
+  ...
+# Subtest: a raced outcome is clean only when done or plainly refused
+ok 275 - a raced outcome is clean only when done or plainly refused
+  ---
+  duration_ms: 0.479183
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 276 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.219501
+  type: 'test'
+  ...
+# Subtest: the departments are synthetic stand-ins
+ok 277 - the departments are synthetic stand-ins
+  ---
+  duration_ms: 0.321475
+  type: 'test'
+  ...
+# Subtest: outcome notes and reasons anywhere in an answer are caught
+ok 278 - outcome notes and reasons anywhere in an answer are caught
+  ---
+  duration_ms: 0.336728
+  type: 'test'
+  ...
+# Subtest: positions, entries and trails are found
+ok 279 - positions, entries and trails are found
+  ---
+  duration_ms: 0.306102
+  type: 'test'
+  ...
+# Subtest: church 10:00 is 08:00 UTC (Africa/Lusaka, no daylight saving)
+ok 280 - church 10:00 is 08:00 UTC (Africa/Lusaka, no daylight saving)
+  ---
+  duration_ms: 0.184569
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 281 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.040411
+  type: 'test'
+  ...
+# Subtest: departments and the cell are synthetic
+ok 282 - departments and the cell are synthetic
+  ---
+  duration_ms: 0.31746
+  type: 'test'
+  ...
+# Subtest: church Sundays and instants
+ok 283 - church Sundays and instants
+  ---
+  duration_ms: 0.532033
+  type: 'test'
+  ...
+# Subtest: a limited conflict carries only its owner kind and busy time
+ok 284 - a limited conflict carries only its owner kind and busy time
+  ---
+  duration_ms: 0.221675
+  type: 'test'
+  ...
+# Subtest: exactly one assignment wins a race; the other is refused for the overlap
+ok 285 - exactly one assignment wins a race; the other is refused for the overlap
+  ---
+  duration_ms: 0.235976
+  type: 'test'
+  ...
+# Subtest: candidates are read defensively
+ok 286 - candidates are read defensively
+  ---
+  duration_ms: 1.15275
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 287 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.338711
+  type: 'test'
+  ...
+# Subtest: the department, cells and texts are synthetic stand-ins
+ok 288 - the department, cells and texts are synthetic stand-ins
+  ---
+  duration_ms: 0.288625
+  type: 'test'
+  ...
+# Subtest: department text anywhere in a cell answer is caught
+ok 289 - department text anywhere in a cell answer is caught
+  ---
+  duration_ms: 0.333013
+  type: 'test'
+  ...
+# Subtest: session claims are read from the token without keeping it
+ok 290 - session claims are read from the token without keeping it
+  ---
+  duration_ms: 1.518152
+  type: 'test'
+  ...
+# Subtest: JSON values are dollar-quoted, and the quote tag is refused inside them
+ok 291 - JSON values are dollar-quoted, and the quote tag is refused inside them
+  ---
+  duration_ms: 0.303558
+  type: 'test'
+  ...
+# Subtest: an owner call runs inside one transaction with the session claims
+ok 292 - an owner call runs inside one transaction with the session claims
+  ---
+  duration_ms: 0.453615
+  type: 'test'
+  ...
+# Subtest: the first JSON line of psql output is the answer
+ok 293 - the first JSON line of psql output is the answer
+  ---
+  duration_ms: 0.350269
+  type: 'test'
+  ...
+# Subtest: church clock times are UTC+2 (Africa/Lusaka, no daylight saving)
+ok 294 - church clock times are UTC+2 (Africa/Lusaka, no daylight saving)
+  ---
+  duration_ms: 0.548948
+  type: 'test'
+  ...
+# Subtest: the department is the synthetic stand-in and every number is in its reserved block
+ok 295 - the department is the synthetic stand-in and every number is in its reserved block
+  ---
+  duration_ms: 2.940449
+  type: 'test'
+  ...
+# Subtest: the target is local unless staging is asked for explicitly, and nothing else is accepted
+ok 296 - the target is local unless staging is asked for explicitly, and nothing else is accepted
+  ---
+  duration_ms: 0.790073
+  type: 'test'
+  ...
+# Subtest: church dates and times are Africa/Lusaka (UTC+2) whatever the machine zone
+ok 297 - church dates and times are Africa/Lusaka (UTC+2) whatever the machine zone
+  ---
+  duration_ms: 0.582439
+  type: 'test'
+  ...
+# Subtest: the quarterly rota is 13 Sundays from the first Sunday at least three days away
+ok 298 - the quarterly rota is 13 Sundays from the first Sunday at least three days away
+  ---
+  duration_ms: 0.99338
+  type: 'test'
+  ...
+# Subtest: the short-notice duty and the reassignment probe are placed relative to the run
+ok 299 - the short-notice duty and the reassignment probe are placed relative to the run
+  ---
+  duration_ms: 0.366233
+  type: 'test'
+  ...
+# Subtest: inbox items are generic and new items are told apart from earlier ones
+ok 300 - inbox items are generic and new items are told apart from earlier ones
+  ---
+  duration_ms: 0.427065
+  type: 'test'
+  ...
+# Subtest: leader-only text, numbers, routes, notes and reasons are caught for a non-leader
+ok 301 - leader-only text, numbers, routes, notes and reasons are caught for a non-leader
+  ---
+  duration_ms: 0.610041
+  type: 'test'
+  ...
+# Subtest: positions are found in the coverage queue and on the board
+ok 302 - positions are found in the coverage queue and on the board
+  ---
+  duration_ms: 0.25831
+  type: 'test'
+  ...
+# Subtest: the staging cleanup SQL names only the run and is not destructive to the schema
+ok 303 - the staging cleanup SQL names only the run and is not destructive to the schema
+  ---
+  duration_ms: 1.054432
+  type: 'test'
+  ...
+# Subtest: a wrong target or a staging run without its guards is refused before any call
+ok 304 - a wrong target or a staging run without its guards is refused before any call
+  ---
+  duration_ms: 280.40481
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 305 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.067162
+  type: 'test'
+  ...
+# Subtest: the department is the synthetic stand-in
+ok 306 - the department is the synthetic stand-in
+  ---
+  duration_ms: 0.13894
+  type: 'test'
+  ...
+# Subtest: only the exact generic text of a duty kind passes
+ok 307 - only the exact generic text of a duty kind passes
+  ---
+  duration_ms: 2.178209
+  type: 'test'
+  ...
+# Subtest: the Q2 fixture bands: 14 days, 48 hours, otherwise 24 hours (short notice when passed)
+ok 308 - the Q2 fixture bands: 14 days, 48 hours, otherwise 24 hours (short notice when passed)
+  ---
+  duration_ms: 0.138599
+  type: 'test'
+  ...
+# Subtest: church instants are Lusaka time (UTC+2) whatever the machine zone
+ok 309 - church instants are Lusaka time (UTC+2) whatever the machine zone
+  ---
+  duration_ms: 5.00081
+  type: 'test'
+  ...
+# Subtest: the pending summary is order independent
+ok 310 - the pending summary is order independent
+  ---
+  duration_ms: 0.140472
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 311 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.27152
+  type: 'test'
+  ...
+# Subtest: the department and the cell are synthetic
+ok 312 - the department and the cell are synthetic
+  ---
+  duration_ms: 0.276487
+  type: 'test'
+  ...
+# Subtest: church Sundays and instants
+ok 313 - church Sundays and instants
+  ---
+  duration_ms: 0.572364
+  type: 'test'
+  ...
+# Subtest: a selection carries each date at the revision the member saw
+ok 314 - a selection carries each date at the revision the member saw
+  ---
+  duration_ms: 0.856604
+  type: 'test'
+  ...
+# Subtest: a race round is all or nothing
+ok 315 - a race round is all or nothing
+  ---
+  duration_ms: 0.24526
+  type: 'test'
+  ...
+# Subtest: each race round names the order it took
+ok 316 - each race round names the order it took
+  ---
+  duration_ms: 0.334385
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 317 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.796522
+  type: 'test'
+  ...
+# Subtest: the department is synthetic
+ok 318 - the department is synthetic
+  ---
+  duration_ms: 0.202876
+  type: 'test'
+  ...
+# Subtest: the changed fields of a stale refusal are read from its field errors
+ok 319 - the changed fields of a stale refusal are read from its field errors
+  ---
+  duration_ms: 0.705626
+  type: 'test'
+  ...
+# Subtest: exactly one winner among concurrent edits
+ok 320 - exactly one winner among concurrent edits
+  ---
+  duration_ms: 0.186752
+  type: 'test'
+  ...
+# Subtest: the first position is read defensively
+ok 321 - the first position is read defensively
+  ---
+  duration_ms: 0.125279
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 322 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.780268
+  type: 'test'
+  ...
+# Subtest: the department is synthetic
+ok 323 - the department is synthetic
+  ---
+  duration_ms: 0.229066
+  type: 'test'
+  ...
+# Subtest: church Sundays are church-local dates at least four days ahead
+ok 324 - church Sundays are church-local dates at least four days ahead
+  ---
+  duration_ms: 0.450159
+  type: 'test'
+  ...
+# Subtest: church time converts across the UTC date boundary
+ok 325 - church time converts across the UTC date boundary
+  ---
+  duration_ms: 0.161113
+  type: 'test'
+  ...
+# Subtest: exactly one winner among concurrent commands
+ok 326 - exactly one winner among concurrent commands
+  ---
+  duration_ms: 0.216006
+  type: 'test'
+  ...
+# Subtest: series occurrences are read defensively
+ok 327 - series occurrences are read defensively
+  ---
+  duration_ms: 0.612966
+  type: 'test'
+  ...
+# Subtest: church instants and clocks (UTC+02:00 all year) match both replaced forms
+ok 328 - church instants and clocks (UTC+02:00 all year) match both replaced forms
+  ---
+  duration_ms: 2.368526
+  type: 'test'
+  ...
+# Subtest: churchSunday is a church Sunday at least four days ahead
+ok 329 - churchSunday is a church Sunday at least four days ahead
+  ---
+  duration_ms: 0.190117
+  type: 'test'
+  ...
+# Subtest: answer predicates
+ok 330 - answer predicates
+  ---
+  duration_ms: 0.236197
+  type: 'test'
+  ...
+# Subtest: session claims and jsonb literals
+ok 331 - session claims and jsonb literals
+  ---
+  duration_ms: 0.802362
+  type: 'test'
+  ...
+# Subtest: scripts re-export the shared helpers their tests import
+ok 332 - scripts re-export the shared helpers their tests import
+  ---
+  duration_ms: 0.159571
+  type: 'test'
+  ...
+# Subtest: every number is in the suite's reserved block and none is another suite's staging persona
+ok 333 - every number is in the suite's reserved block and none is another suite's staging persona
+  ---
+  duration_ms: 1.440736
+  type: 'test'
+  ...
+# Subtest: the target is local unless staging is asked for explicitly, and nothing else is accepted
+ok 334 - the target is local unless staging is asked for explicitly, and nothing else is accepted
+  ---
+  duration_ms: 0.503601
+  type: 'test'
+  ...
+# Subtest: the run calendar is 12-21 church days ahead and fits the 31-day coverage window
+ok 335 - the run calendar is 12-21 church days ahead and fits the 31-day coverage window
+  ---
+  duration_ms: 0.937035
+  type: 'test'
+  ...
+# Subtest: the read matrix: admin-only, oversight, scope-only and own reads
+ok 336 - the read matrix: admin-only, oversight, scope-only and own reads
+  ---
+  duration_ms: 0.574508
+  type: 'test'
+  ...
+# Subtest: the command probes: conflict only with authority, otherwise refused without disclosure
+ok 337 - the command probes: conflict only with authority, otherwise refused without disclosure
+  ---
+  duration_ms: 0.650001
+  type: 'test'
+  ...
+# Subtest: reading answers: positions, history, what changed, limited conflicts and leaks
+ok 338 - reading answers: positions, history, what changed, limited conflicts and leaks
+  ---
+  duration_ms: 8.328944
+  type: 'test'
+  ...
+# Subtest: the staging cleanup SQL removes the run's rows, keeps people and departments A and B, and is not destructive
+ok 339 - the staging cleanup SQL removes the run's rows, keeps people and departments A and B, and is not destructive
+  ---
+  duration_ms: 0.715941
+  type: 'test'
+  ...
+# Subtest: the summary shows both matrices and marks a difference
+ok 340 - the summary shows both matrices and marks a difference
+  ---
+  duration_ms: 0.490461
+  type: 'test'
+  ...
+# Subtest: a wrong target or a staging run without its guards is refused before any call
+ok 341 - a wrong target or a staging run without its guards is refused before any call
+  ---
+  duration_ms: 235.870794
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 342 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.803372
+  type: 'test'
+  ...
+# Subtest: the department is the synthetic stand-in
+ok 343 - the department is the synthetic stand-in
+  ---
+  duration_ms: 0.203597
+  type: 'test'
+  ...
+# Subtest: the deep link matches the reminder contract
+ok 344 - the deep link matches the reminder contract
+  ---
+  duration_ms: 0.103886
+  type: 'test'
+  ...
+# Subtest: the first assignment is read defensively
+ok 345 - the first assignment is read defensively
+  ---
+  duration_ms: 0.552924
+  type: 'test'
+  ...
+# Subtest: a refused table query is an error status without rows
+ok 346 - a refused table query is an error status without rows
+  ---
+  duration_ms: 0.131108
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 347 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 2.084598
+  type: 'test'
+  ...
+# Subtest: the department, source and purposes are the synthetic stand-ins
+ok 348 - the department, source and purposes are the synthetic stand-ins
+  ---
+  duration_ms: 0.264139
+  type: 'test'
+  ...
+# Subtest: a follow-up reminder links to the task only
+ok 349 - a follow-up reminder links to the task only
+  ---
+  duration_ms: 0.202125
+  type: 'test'
+  ...
+# Subtest: only the exact generic text of a follow-up kind passes
+ok 350 - only the exact generic text of a follow-up kind passes
+  ---
+  duration_ms: 0.388676
+  type: 'test'
+  ...
+# Subtest: the pending summary is order independent
+ok 351 - the pending summary is order independent
+  ---
+  duration_ms: 0.181263
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 352 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.78769
+  type: 'test'
+  ...
+# Subtest: the department and the source are the synthetic stand-ins
+ok 353 - the department and the source are the synthetic stand-ins
+  ---
+  duration_ms: 0.187032
+  type: 'test'
+  ...
+# Subtest: a routing task with any private key is flagged
+ok 354 - a routing task with any private key is flagged
+  ---
+  duration_ms: 0.204409
+  type: 'test'
+  ...
+# Subtest: a task is found by id, defensively
+ok 355 - a task is found by id, defensively
+  ---
+  duration_ms: 0.831034
+  type: 'test'
+  ...
+# Subtest: a refused table query is an error status without rows
+ok 356 - a refused table query is an error status without rows
+  ---
+  duration_ms: 0.13875
+  type: 'test'
+  ...
+# Subtest: the grants run uses only its reserved fictional numbers
+ok 357 - the grants run uses only its reserved fictional numbers
+  ---
+  duration_ms: 0.981842
+  type: 'test'
+  ...
+# Subtest: run.mjs keeps re-exporting the moved helpers
+ok 358 - run.mjs keeps re-exporting the moved helpers
+  ---
+  duration_ms: 0.756432
+  type: 'test'
+  ...
+# Subtest: startRun writes redacted evidence and finish reports failures
+ok 359 - startRun writes redacted evidence and finish reports failures
+  ---
+  duration_ms: 3.230036
+  type: 'test'
+  ...
+# Subtest: localHttp builds the same headers as the per-run clients did
+ok 360 - localHttp builds the same headers as the per-run clients did
+  ---
+  duration_ms: 20.666882
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 361 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.016775
+  type: 'test'
+  ...
+# Subtest: a signal is generic only as an empty inbox_changed broadcast on the own topic
+ok 362 - a signal is generic only as an empty inbox_changed broadcast on the own topic
+  ---
+  duration_ms: 0.545323
+  type: 'test'
+  ...
+# Subtest: a private value anywhere but the own topic fails the check
+ok 363 - a private value anywhere but the own topic fails the check
+  ---
+  duration_ms: 0.216327
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 364 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.015403
+  type: 'test'
+  ...
+# Subtest: worker counts add up across racing runs
+ok 365 - worker counts add up across racing runs
+  ---
+  duration_ms: 0.987911
+  type: 'test'
+  ...
+# Subtest: leaks lists only the values found in the text
+ok 366 - leaks lists only the values found in the text
+  ---
+  duration_ms: 0.239462
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 367 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.218029
+  type: 'test'
+  ...
+# Subtest: the member status may not carry a reason, an actor or an obligation
+ok 368 - the member status may not carry a reason, an actor or an obligation
+  ---
+  duration_ms: 0.833779
+  type: 'test'
+  ...
+# Subtest: request codes use the 2.9 alphabet
+ok 369 - request codes use the 2.9 alphabet
+  ---
+  duration_ms: 1.056094
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 370 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.117067
+  type: 'test'
+  ...
+# Subtest: synthetic device tokens have the stored shape and differ each time
+ok 371 - synthetic device tokens have the stored shape and differ each time
+  ---
+  duration_ms: 0.639305
+  type: 'test'
+  ...
+# Subtest: a generic message carries only the fixed text and the item id
+ok 372 - a generic message carries only the fixed text and the item id
+  ---
+  duration_ms: 0.733237
+  type: 'test'
+  ...
+# Subtest: leaks lists only the values found in the text
+ok 373 - leaks lists only the values found in the text
+  ---
+  duration_ms: 0.899568
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 374 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.142645
+  type: 'test'
+  ...
+# Subtest: a PKCE pair is a base64url verifier and its S256 challenge
+ok 375 - a PKCE pair is a base64url verifier and its S256 challenge
+  ---
+  duration_ms: 0.545774
+  type: 'test'
+  ...
+# Subtest: redirect facts keep the base and drop the code
+ok 376 - redirect facts keep the base and drop the code
+  ---
+  duration_ms: 0.87405
+  type: 'test'
+  ...
+# Subtest: the code is read from the query, never from the route fragment
+ok 377 - the code is read from the query, never from the route fragment
+  ---
+  duration_ms: 0.260863
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 378 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.747519
+  type: 'test'
+  ...
+# Subtest: an applicant view must carry no staff-only review keys
+ok 379 - an applicant view must carry no staff-only review keys
+  ---
+  duration_ms: 0.684073
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 380 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 1.365832
+  type: 'test'
+  ...
+# Subtest: synthetic device tokens have the stored shape and differ each time
+ok 381 - synthetic device tokens have the stored shape and differ each time
+  ---
+  duration_ms: 0.84837
+  type: 'test'
+  ...
+# Subtest: leaks lists only the values found in the text
+ok 382 - leaks lists only the values found in the text
+  ---
+  duration_ms: 0.905968
+  type: 'test'
+  ...
+# Subtest: only the exact local origin is accepted
+ok 383 - only the exact local origin is accepted
+  ---
+  duration_ms: 1.12547
+  type: 'test'
+  ...
+# Subtest: only reserved fictional numbers are used
+ok 384 - only reserved fictional numbers are used
+  ---
+  duration_ms: 0.341425
+  type: 'test'
+  ...
+# Subtest: amr methods are read without keeping the token
+ok 385 - amr methods are read without keeping the token
+  ---
+  duration_ms: 1.298791
+  type: 'test'
+  ...
+# Subtest: secret-bearing keys are redacted at any depth
+ok 386 - secret-bearing keys are redacted at any depth
+  ---
+  duration_ms: 0.494367
+  type: 'test'
+  ...
+# Subtest: story 2.2: link tokens, email OTPs and emails are redacted too
+ok 387 - story 2.2: link tokens, email OTPs and emails are redacted too
+  ---
+  duration_ms: 0.301896
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of the rehearsal are accepted
+ok 388 - only the reserved fictional numbers of the rehearsal are accepted
+  ---
+  duration_ms: 7.359611
+  type: 'test'
+  ...
+# Subtest: an emailed link yields the link and its token parameters as secrets
+ok 389 - an emailed link yields the link and its token parameters as secrets
+  ---
+  duration_ms: 1.194894
+  type: 'test'
+  ...
+# Subtest: any change to an Auth fact the operator must not touch is reported
+ok 390 - any change to an Auth fact the operator must not touch is reported
+  ---
+  duration_ms: 0.305921
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 391 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.964787
+  type: 'test'
+  ...
+# Subtest: a superseded answer is generic only with exactly the generic fields and no source values
+ok 392 - a superseded answer is generic only with exactly the generic fields and no source values
+  ---
+  duration_ms: 0.210838
+  type: 'test'
+  ...
+# Subtest: only the exact staging origin is accepted
+ok 393 - only the exact staging origin is accepted
+  ---
+  duration_ms: 1.704684
+  type: 'test'
+  ...
+# Subtest: every number the suite uses is fictional and the sets do not overlap
+ok 394 - every number the suite uses is fictional and the sets do not overlap
+  ---
+  duration_ms: 0.447445
+  type: 'test'
+  ...
+# Subtest: the state file must be outside the repository; keys must be publishable
+ok 395 - the state file must be outside the repository; keys must be publishable
+  ---
+  duration_ms: 16.074057
+  type: 'test'
+  ...
+# Subtest: evidence never carries tokens, passwords, grant secrets, codes, phones or emails
+ok 396 - evidence never carries tokens, passwords, grant secrets, codes, phones or emails
+  ---
+  duration_ms: 0.737323
+  type: 'test'
+  ...
+# Subtest: the matrix covers every principal against every api read and command
+ok 397 - the matrix covers every principal against every api read and command
+  ---
+  duration_ms: 0.922843
+  type: 'test'
+  ...
+# Subtest: expected answers follow the access rules
+ok 398 - expected answers follow the access rules
+  ---
+  duration_ms: 1.217738
+  type: 'test'
+  ...
+# Subtest: probe envelopes can never succeed
+ok 399 - probe envelopes can never succeed
+  ---
+  duration_ms: 0.758895
+  type: 'test'
+  ...
+# Subtest: the pacer keeps a sliding window
+ok 400 - the pacer keeps a sliding window
+  ---
+  duration_ms: 0.259572
+  type: 'test'
+  ...
+# Subtest: the summary marks mismatches and lists owner steps
+ok 401 - the summary marks mismatches and lists owner steps
+  ---
+  duration_ms: 0.618234
+  type: 'test'
+  ...
+# Subtest: a wrong trigger is well-formed and random
+ok 402 - a wrong trigger is well-formed and random
+  ---
+  duration_ms: 1.56297
+  type: 'test'
+  ...
+# Subtest: only the reserved fictional numbers of this run are accepted
+ok 403 - only the reserved fictional numbers of this run are accepted
+  ---
+  duration_ms: 0.364611
+  type: 'test'
+  ...
+# Subtest: lease tokens are read per job and leases compared for overlap
+ok 404 - lease tokens are read per job and leases compared for overlap
+  ---
+  duration_ms: 0.321255
+  type: 'test'
+  ...
+# Subtest: credentials are local-environment system credentials and the URL is the worker
+ok 405 - credentials are local-environment system credentials and the URL is the worker
+  ---
+  duration_ms: 0.407816
+  type: 'test'
+  ...
+# Subtest: arguments: run-once with an optional bounded limit only
+ok 406 - arguments: run-once with an optional bounded limit only
+  ---
+  duration_ms: 1.159361
+  type: 'test'
+  ...
+# Subtest: the credential comes from the environment or its file and is never echoed when malformed
+ok 407 - the credential comes from the environment or its file and is never echoed when malformed
+  ---
+  duration_ms: 0.711194
+  type: 'test'
+  ...
+# Subtest: only the counts of the answer are kept
+ok 408 - only the counts of the answer are kept
+  ---
+  duration_ms: 0.201805
+  type: 'test'
+  ...
+# Subtest: one step over the system route with the worker credential
+ok 409 - one step over the system route with the worker credential
+  ---
+  duration_ms: 0.453024
+  type: 'test'
+  ...
+# Subtest: a refusal throws with the route code only
+ok 410 - a refusal throws with the route code only
+  ---
+  duration_ms: 0.527597
+  type: 'test'
+  ...
+1..410
+# tests 410
+# suites 0
+# pass 410
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1666.314341
+
+finished_utc: 2026-10-30T19:29:16.469231+00:00
+exit_code: 0

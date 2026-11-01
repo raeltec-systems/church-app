@@ -1,0 +1,179 @@
+{
+  "observed_at_utc": "2026-10-30T19:59:33.222915+00:00",
+  "target": "tmurpotfluignacfueki (staging)",
+  "source_reference": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "method": "POST read-only RPCs with publishable key only; no Authorization header or signed-in session.",
+  "limitations": [
+    "HTTP read observations, not UI, device, rights-policy approval, whole-canon verification or source-byte parity.",
+    "No keys, UUIDs of real records, Bible text or other response content retained."
+  ],
+  "checks": [
+    {
+      "rpc": "content_public_events",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "count": 1,
+        "keys": [
+          "events",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "rpc": "content_public_announcements",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "count": 0,
+        "keys": [
+          "announcements",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "rpc": "content_public_banners",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "count": 1,
+        "keys": [
+          "banners",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "rpc": "content_public_giving_methods",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "count": 0,
+        "keys": [
+          "methods",
+          "sample",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "rpc": "content_public_sermons",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "count": 0,
+        "keys": [
+          "series",
+          "sermons",
+          "truncated"
+        ]
+      }
+    },
+    {
+      "rpc": "content_public_sunday_hymns",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "item_count": 0,
+        "keys": [
+          "edition",
+          "items",
+          "publication_revision",
+          "sunday"
+        ]
+      }
+    },
+    {
+      "rpc": "content_public_event",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "unknown_record_is_null": true
+      }
+    },
+    {
+      "rpc": "content_public_sermon",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "unknown_record_is_null": true
+      }
+    },
+    {
+      "rpc": "content_public_giving_method",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "unknown_record_is_null": true
+      }
+    },
+    {
+      "rpc": "content_public_bible_translations",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "translations": [
+          {
+            "code": "WEB",
+            "chapter_count": 1189,
+            "book_count": 66,
+            "offline_allowed": true
+          }
+        ]
+      }
+    },
+    {
+      "rpc": "content_bible_manifest",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "unknown_manifest_is_null": true
+      }
+    },
+    {
+      "rpc": "content_public_bible_chapter",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "unknown_chapter_is_null": true
+      }
+    },
+    {
+      "rpc": "content_public_bible_chapter",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "book_id": "GEN",
+        "chapter_number": 1,
+        "verse_count": 31,
+        "offline_allowed": true,
+        "text_omitted": true
+      }
+    },
+    {
+      "rpc": "content_public_bible_chapter",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "book_id": "JHN",
+        "chapter_number": 5,
+        "verse_count": 47,
+        "offline_allowed": true,
+        "text_omitted": true
+      }
+    },
+    {
+      "rpc": "content_public_bible_chapter",
+      "http_status": 200,
+      "status": "run-passed",
+      "observation": {
+        "book_id": "REV",
+        "chapter_number": 22,
+        "verse_count": 21,
+        "offline_allowed": true,
+        "text_omitted": true
+      }
+    }
+  ]
+}

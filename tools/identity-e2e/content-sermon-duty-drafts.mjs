@@ -281,6 +281,10 @@ async function main() {
       }
     }
     check('D90-no-client-role-reads-the-link-or-the-duty-tables', tables.every((s) => s >= 400), { statuses: tables });
+    if (process.argv.includes('--contention')) {
+      const { runContention } = await import('./content-sermon-duty-lock.mjs');
+      await runContention({ check, log, psql, people, duty, send, grant, department: d, occRevision, publish });
+    }
   } finally {
     const left = cleanup();
     if (marked) {

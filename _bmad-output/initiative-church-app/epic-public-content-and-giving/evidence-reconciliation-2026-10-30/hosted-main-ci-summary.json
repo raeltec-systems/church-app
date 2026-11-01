@@ -1,0 +1,38 @@
+{
+  "base": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "run": 40733936249,
+  "policyJob": 122977303285,
+  "excerpts": [
+    "2026-10-28T17:15:37.3607670Z # tests 56",
+    "2026-10-28T17:15:37.9914132Z check-migrations: 63 new migration(s) since base",
+    "2026-10-28T17:15:37.9925492Z check-migrations: 101 migration(s) ordered, unique and non-destructive (base f806a1472bbc8ca95d104500db5859b163c46e2c)",
+    "2026-10-28T17:15:38.7237418Z ##[notice]drift check for staging skipped: SUPABASE_ACCESS_TOKEN is not set (owner step in docs/runbooks/environments-and-promotion.md)"
+  ],
+  "inspected_on": "2026-10-30",
+  "origin": "GitHub connector: fetch_workflow_run_jobs and fetch_workflow_job_logs",
+  "run_url": "https://github.com/raeltec-systems/church-app/actions/runs/40733936249",
+  "jobs": [
+    {
+      "id": 122977302913,
+      "name": "flutter",
+      "conclusion": "success"
+    },
+    {
+      "id": 122977303023,
+      "name": "auth-harness",
+      "conclusion": "success"
+    },
+    {
+      "id": 122977303186,
+      "name": "db",
+      "conclusion": "success"
+    },
+    {
+      "id": 122977303285,
+      "name": "policy",
+      "conclusion": "success"
+    }
+  ],
+  "staging_drift": "skipped; SUPABASE_ACCESS_TOKEN unset",
+  "limit": "Historical CI for base commit only; does not establish current staging parity, device acceptance, or branch-head CI."
+}

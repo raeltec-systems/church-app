@@ -1,0 +1,22 @@
+{
+    "application_source":  "33e97b2c4443578a0a86a92c02014b5730048bbd",
+    "vercel_project":  "bic-kafue-staff-staging",
+    "project_id":  "prj_vgNEKw8fa6yWaeei9BMgJtWJI0Sp",
+    "deployment_id":  "dpl_GidFY69Cfi62EyMwmM95oiSqQQHi",
+    "deployment_target":  "staging",
+    "observed_state":  "READY",
+    "url":  "https://bic-kafue-staff-staging-israel-muyobas-projects.vercel.app",
+    "backend":  "https://tmurpotfluignacfueki.supabase.co",
+    "build_info_http_status":  200,
+    "web_source_files":  53,
+    "web_source_tree_sha256":  "96b973edb685f82ffc19cd397afd45ce7bc6c5c3ff6554ac38f71960a59af9b1",
+    "web_sealed_at_utc":  "2026-10-31T10:19:25.353Z",
+    "deployment_protection":  "Vercel authentication retained; temporary share URL delivered only in conversation",
+    "release_url":  "https://github.com/raeltec-systems/church-app/releases/tag/staging-owner-20261031-33e97b2",
+    "release_is_prerelease":  true,
+    "exact_source_ci_run":  41187112542,
+    "exact_source_ci_conclusion":  "success",
+    "production_backend_changed":  false,
+    "database_mutations":  false,
+    "notifications_sent":  false
+}

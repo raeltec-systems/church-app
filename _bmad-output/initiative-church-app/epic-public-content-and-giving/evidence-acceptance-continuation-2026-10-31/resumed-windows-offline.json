@@ -1,0 +1,16 @@
+{
+    "scope":  "Offline tests; no hosted or device acceptance",
+    "finished_at_utc":  "2026-10-31T08:53:15.2090417Z",
+    "started_at_utc":  "2026-10-31T08:52:58.6972870Z",
+    "command":  "node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs tools/hymn-book/*.test.mjs",
+    "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+    "exit":  0,
+    "platform":  "Windows native Node 22.16.0, Git Bash",
+    "totals":  {
+                   "skipped":  0,
+                   "tests":  436,
+                   "failed":  0,
+                   "passed":  436
+               },
+    "log_sha256":  "34ebb42693846a7c672fb37f779c6e1ace536b1cb25f6666509965331b86cbce"
+}

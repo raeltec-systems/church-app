@@ -22,8 +22,9 @@ pg() {
   if command -v psql >/dev/null 2>&1; then
     psql "$DB_URL" -X -qtA -v ON_ERROR_STOP=1 "$@"
   else
-    docker exec -i -e PGAPPNAME="${PGAPPNAME:-psql}" \
-      "$(docker ps --filter name=supabase_db_ --format '{{.Names}}' | head -1)" \
+    local db_container
+    db_container=$(node tools/auth-harness/local-target.mjs db) || die "exact local database could not be verified"
+    docker exec -i -e PGAPPNAME="${PGAPPNAME:-psql}" "$db_container" \
       psql -U postgres -X -qtA -v ON_ERROR_STOP=1 "$@"
   fi
 }

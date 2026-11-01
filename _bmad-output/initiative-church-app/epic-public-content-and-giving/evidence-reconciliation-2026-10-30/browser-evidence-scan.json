@@ -1,0 +1,11 @@
+{
+  "name": "browser-evidence-scan",
+  "command": "bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30",
+  "cwd": ".",
+  "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+  "started_utc": "2026-10-30T20:15:51.825017+00:00",
+  "finished_utc": "2026-10-30T20:15:52.417216+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/browser-evidence-scan.log"
+}

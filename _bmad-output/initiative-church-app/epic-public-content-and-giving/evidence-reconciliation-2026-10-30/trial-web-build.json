@@ -1,0 +1,11 @@
+{
+  "name": "trial-web-build",
+  "command": "flutter build web",
+  "cwd": "trials/staff_web",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:40:32.112081+00:00",
+  "finished_utc": "2026-10-30T19:45:12.942598+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/trial-web-build.log.gz"
+}

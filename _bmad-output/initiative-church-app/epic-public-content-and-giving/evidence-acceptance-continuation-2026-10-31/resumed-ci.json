@@ -1,0 +1,37 @@
+{
+  "head": "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+  "recorded_at_utc": "2026-10-31T09:03:35.937Z",
+  "source": "Connected GitHub.fetch_commit_workflow_runs; fetch_workflow_run_jobs",
+  "runs": [
+    {
+      "id": 41186367837,
+      "name": "ci",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/raeltec-systems/church-app/actions/runs/41186367837"
+    },
+    {
+      "id": 41186367818,
+      "name": "Epic 7 planning evidence",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 41186367813,
+      "name": "Manual history repair validation",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "ci_scope": [
+    "policy",
+    "offline harness/functions",
+    "database pgTAP, API smoke, contract fixtures, isolated restore",
+    "Flutter analysis, tests, VM/Chrome contracts, non-Lusaka checks, staff/trial builds and bundle scan"
+  ],
+  "limits": [
+    "Credential-dependent live staging-drift step is not a full hosted parity result.",
+    "No signed-in owner UI or physical-device acceptance.",
+    "Later documentation commits require separately attributed results."
+  ]
+}

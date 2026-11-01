@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { localStatus, localContainer } from '../auth-harness/local-target.mjs';
 
 export const LOCAL_ORIGIN = 'http://127.0.0.1:54321';
 
@@ -55,26 +56,22 @@ export function redact(value) {
  * required and returned (a run that never uses the secret or service-role key).
  */
 export function localKey({ admin = true } = {}) {
-  // On Windows npx is a .cmd script, which Node starts only through a shell.
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], shell: process.platform === 'win32' });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
+  const env = localStatus();
+  const url = env.API_URL;
+  const key = env.PUBLISHABLE_KEY;
   if (!admin) {
     if (!url || !key) throw new Error('local stack is not running');
-    return { origin: assertLocalOrigin(url), key };
+    return { origin: url, key };
   }
-  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
-  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
+  const secret = env.SECRET_KEY;
+  const service = env.SERVICE_ROLE_KEY;
   if (!url || !key || !secret || !service) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key, secret, service };
+  return { origin: url, key, secret, service };
 }
 
 /** The local Supabase db container's name. */
 export function dbContainer() {
-  // Prefer this project's container (other Supabase projects may run on the same machine).
-  const names = execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n');
-  return names.includes('supabase_db_church-app') ? 'supabase_db_church-app' : names[0];
+  return localContainer('db');
 }
 
 /**

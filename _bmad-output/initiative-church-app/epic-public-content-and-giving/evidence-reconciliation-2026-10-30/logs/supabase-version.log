@@ -1,0 +1,56 @@
+command: npx --no-install supabase --version
+cwd: .
+head: c96cd562b2650c37f5d3d879cb12891419700139
+started_utc: 2026-10-30T19:29:44.615822+00:00
+
+24 | ${r}${n[i]}`;if(e.cause)a+=` {
+25 | ${e7e(e.cause,`${r}  `)}
+26 | ${r}}`;return a},aQ="~effect/Fiber",RIr,MIr,yx=()=>globalThis[lR],VLe,NIr,BLe,pQ=(e)=>{if(!e.currentStackFrame)return;let r=new Map;return r.set(Ume.key,e.currentStackFrame),ep(r)},jIr=(e)=>{if(e._children===void 0||e._children.size===0)return;return M_(e._children)},KLe=(e)=>{let r=e;if(r._exit)return xn(r._exit);return Wu((n)=>{if(r._exit)return n(xn(r._exit));return Uo(e.addObserver((a)=>n(xn(a))))})},WLe=(e)=>Wu((r)=>{let n=e[Symbol.iterator](),a=[],i=void 0;function l(){let H=n.next();while(!H.done){if(H.value._exit){a.push(H.value._exit),H=n.next();continue}i=H.value.addObserver((c)=>{a.push(c),l()});return}r(xn(a))}return l(),Uo(()=>i?.())}),t7e=(e)=>{let r=e;if(r._exit)return r._exit;return Wu((n)=>{if(r._exit)return n(r._exit);return Uo(e.addObserver(n))})},dQ=(e)=>ai((r)=>r7e(e,r.id)),r7e,M_=(e)=>ai((r)=>{let n=pQ(r),a=Py();for(let i of e)i.interruptUnsafe(r.id,n),a.push(i);return LQ(WLe(a))}),xn,BH,vm,Uo,Di,JLe,n7e=(e)=>e==null?vm(new hX):xn(e),o7e,e2,i7e=(e)=>xn(Je(e)),t2,a7e=(e)=>Di(()=>BH(Ds(e))
+27 | `);if(a){if(m===0)s(""),f=1,m=A.indexOf(`
+28 | `,f);else s("");a=!1}while(p!==-1||m!==-1)if(p===-1||m!==-1&&m<p)s(A.substring(f,m)),f=m+1,m=A.indexOf(`
+29 | `,f);n=n+A.substring(f,A.length-(a?1:0))}}return np(o)?o:null}let H=ir(()=>{if(i._tag==="Some")return $a(i.value);return E2(e,{onSuccess:c,onFailure:pi,onDone:(t)=>{if(i=Je(t),n.length>0||a){let o=n;return n="",a=!1,F([o])}return $a(t)}})});function c(t){let o=l(t);return o!==null?F(o):H}return H})),cze,lze,nM=(e)=>JH((r,n)=>{let a;return F(ir(()=>{if(a)return a;return e.pipe(fa(n),De((i)=>$s(i)(r,n)),De((i)=>a=i))}))}),uze,$ze,Aze,oM=(e,r,n)=>ir(()=>{let a=cp(),i=$s(e)($a(),a);return O$(De(i,r),n?n:F).pipe(aa((l)=>So(a,l)))}),fze,pze,dze,mze=(e)=>oM(e,(r)=>Oc(r,{disableYield:!0})),gye,Lze,hze=(e)=>ir(()=>{let r=Ae();return oM(e,(n)=>n.pipe(P2,De((a)=>(r=a,$a()))),()=>F(r))}),yze=(e)=>ir(()=>{let r=Symbol(),n=r;return oM(e,(a)=>Oc(De(a,(i)=>(n=i,ie)),{disableYield:!0}),()=>n===r?wm:WQ(n))}),Az,gze,fz=(e,r)=>$s(e)($a(),r);var Rx=g(()=>{op();KH();Ho();sn();Cl();pp();zr();Ss();q9();Q_();w2();Io();pH();Ro();Hz();K_();Fy();rp();KQ();Qu();aT();IDr={[RQe]:{_Env:yr,_InErr:yr,_InElem:yr,_OutErr:yr,_OutElem:yr},pipe(){
+
+error: Unknown: FileSystem.makeDirectory (/root/.supabase)
+       _tag: "PlatformError",
+ ~effect/platform/PlatformError: "~effect/platform/PlatformError",
+
+      at df (/$bunfs/root/supabase:29:5194)
+      at <anonymous> (/$bunfs/root/supabase:25:45501)
+      at guarded (internal:shared:112:26)
+
+24 | ${r}${n[i]}`;if(e.cause)a+=` {
+25 | ${e7e(e.cause,`${r}  `)}
+26 | ${r}}`;return a},aQ="~effect/Fiber",RIr,MIr,yx=()=>globalThis[lR],VLe,NIr,BLe,pQ=(e)=>{if(!e.currentStackFrame)return;let r=new Map;return r.set(Ume.key,e.currentStackFrame),ep(r)},jIr=(e)=>{if(e._children===void 0||e._children.size===0)return;return M_(e._children)},KLe=(e)=>{let r=e;if(r._exit)return xn(r._exit);return Wu((n)=>{if(r._exit)return n(xn(r._exit));return Uo(e.addObserver((a)=>n(xn(a))))})},WLe=(e)=>Wu((r)=>{let n=e[Symbol.iterator](),a=[],i=void 0;function l(){let H=n.next();while(!H.done){if(H.value._exit){a.push(H.value._exit),H=n.next();continue}i=H.value.addObserver((c)=>{a.push(c),l()});return}r(xn(a))}return l(),Uo(()=>i?.())}),t7e=(e)=>{let r=e;if(r._exit)return r._exit;return Wu((n)=>{if(r._exit)return n(r._exit);return Uo(e.addObserver(n))})},dQ=(e)=>ai((r)=>r7e(e,r.id)),r7e,M_=(e)=>ai((r)=>{let n=pQ(r),a=Py();for(let i of e)i.interruptUnsafe(r.id,n),a.push(i);return LQ(WLe(a))}),xn,BH,vm,Uo,Di,JLe,n7e=(e)=>e==null?vm(new hX):xn(e),o7e,e2,i7e=(e)=>xn(Je(e)),t2,a7e=(e)=>Di(()=>BH(Ds(e))
+27 | `);if(a){if(m===0)s(""),f=1,m=A.indexOf(`
+28 | `,f);else s("");a=!1}while(p!==-1||m!==-1)if(p===-1||m!==-1&&m<p)s(A.substring(f,m)),f=m+1,m=A.indexOf(`
+29 | `,f);n=n+A.substring(f,A.length-(a?1:0))}}return np(o)?o:null}let H=ir(()=>{if(i._tag==="Some")return $a(i.value);return E2(e,{onSuccess:c,onFailure:pi,onDone:(t)=>{if(i=Je(t),n.length>0||a){let o=n;return n="",a=!1,F([o])}return $a(t)}})});function c(t){let o=l(t);return o!==null?F(o):H}return H})),cze,lze,nM=(e)=>JH((r,n)=>{let a;return F(ir(()=>{if(a)return a;return e.pipe(fa(n),De((i)=>$s(i)(r,n)),De((i)=>a=i))}))}),uze,$ze,Aze,oM=(e,r,n)=>ir(()=>{let a=cp(),i=$s(e)($a(),a);return O$(De(i,r),n?n:F).pipe(aa((l)=>So(a,l)))}),fze,pze,dze,mze=(e)=>oM(e,(r)=>Oc(r,{disableYield:!0})),gye,Lze,hze=(e)=>ir(()=>{let r=Ae();return oM(e,(n)=>n.pipe(P2,De((a)=>(r=a,$a()))),()=>F(r))}),yze=(e)=>ir(()=>{let r=Symbol(),n=r;return oM(e,(a)=>Oc(De(a,(i)=>(n=i,ie)),{disableYield:!0}),()=>n===r?wm:WQ(n))}),Az,gze,fz=(e,r)=>$s(e)($a(),r);var Rx=g(()=>{op();KH();Ho();sn();Cl();pp();zr();Ss();q9();Q_();w2();Io();pH();Ro();Hz();K_();Fy();rp();KQ();Qu();aT();IDr={[RQe]:{_Env:yr,_InErr:yr,_InElem:yr,_OutErr:yr,_OutElem:yr},pipe(){
+
+error: Unknown: FileSystem.makeDirectory (/root/.supabase)
+       _tag: "Unknown",
+     module: "FileSystem",
+     method: "makeDirectory",
+ pathOrDescriptor: "/root/.supabase",
+    syscall: "mkdir",
+
+      at df (/$bunfs/root/supabase:29:5201)
+      at <anonymous> (/$bunfs/root/supabase:25:45501)
+      at guarded (internal:shared:112:26)
+
+EROFS: read-only file system, mkdir '/root/.supabase'
+    path: "/root/.supabase",
+ syscall: "mkdir",
+   errno: -30,
+    code: "EROFS"
+
+
+EROFS: read-only file system, mkdir '/root/.supabase'
+    path: "/root/.supabase",
+ syscall: "mkdir",
+   errno: -30,
+    code: "EROFS"
+
+
+Bun v1.4.2 (Linux x64)
+
+finished_utc: 2026-10-30T19:29:45.406917+00:00
+exit_code: 1

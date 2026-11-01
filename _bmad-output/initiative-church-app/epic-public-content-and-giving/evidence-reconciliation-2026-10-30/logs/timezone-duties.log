@@ -1,0 +1,265 @@
+command: env TZ=America/New_York flutter test test/duties --reporter expanded --concurrency=2
+cwd: packages/client_core
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:51:29.822534+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_ui 1.1.1 (1.1.5 available)
+  flutter_secure_storage 10.0.0 (11.2.0 available)
+  flutter_secure_storage_darwin 0.2.0 (0.4.3 available)
+  go_router 18.0.2 (18.1.2 available)
+  gotrue 2.27.2 (2.27.3 available)
+  jni 1.1.0 (1.1.1 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.5.0 (1.9.0 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.3 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+Got dependencies!
+22 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart
+00:00 +0: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: wire mapping a changed revision parses with the earlier answer and ids
+00:00 +1: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: wire mapping a department carries its pending handovers and leader state
+00:00 +2: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: wire mapping a department carries its pending handovers and leader state
+00:00 +3: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: wire mapping a department carries its pending handovers and leader state
+00:00 +4: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: wire mapping a refusal names what changed in plain words
+00:00 +5: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: wire mapping a vacated position on the board (no reason sent, none read)
+00:00 +6: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: wire mapping a vacated position on the board (no reason sent, none read)
+00:00 +7: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:00 +8: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:00 +9: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:03 +10: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:04 +11: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:04 +12: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:05 +13: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:05 +14: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: staff web: departments (Admin) marking it done; a missing leader is explained
+00:06 +15: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty an instructions-only change keeps the answer
+00:06 +16: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty an instructions-only change keeps the answer
+00:07 +17: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_lifecycle_test.dart: staff web: the vacancy flag the board shows Needs a new person
+00:07 +18: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a concurrent change by another leader is a conflict
+00:08 +19: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a concurrent change by another leader is a conflict
+00:08 +20: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a concurrent change by another leader is a conflict
+00:08 +21: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a concurrent change by another leader is a conflict
+00:08 +22: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a concurrent change by another leader is a conflict
+00:08 +23: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a concurrent change by another leader is a conflict
+00:09 +24: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:12 +25: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:13 +26: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+00:14 +27: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:14 +28: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:15 +29: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:15 +30: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:16 +31: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:16 +32: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:16 +33: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:17 +34: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+00:17 +35: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: mobile: a changed duty an old reminder link opens the current version
+00:17 +36: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings no overlap: no reason, and no claim that they are free
+00:17 +37: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings no overlap: no reason, and no claim that they are free
+00:18 +38: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings the board shows overlaps and the recorded reason
+00:19 +39: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings changing a duty asks about the person at the new times
+00:19 +40: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings changing a duty asks about the person at the new times
+00:19 +41: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings changing a duty asks about the person at the new times
+00:19 +42: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings changing a duty asks about the person at the new times
+00:21 +43: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen shows Not recorded, the answer apart and the trail
+00:22 +44: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen shows Not recorded, the answer apart and the trail
+00:23 +45: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: the rota picker a planned person keeps their plan with a new reason
+00:23 +46: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen record an outcome (nothing shown until the server answers)
+00:23 +47: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen record an outcome (nothing shown until the server answers)
+00:25 +48: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +49: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +50: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +51: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +52: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +53: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +54: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +55: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:26 +56: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a declined duty offers no No-show; a refusal is explained
+00:27 +57: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+00:28 +58: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+00:29 +59: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+00:30 +60: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+00:30 +61: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+00:31 +62: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes S2: 31 days from the shown From never asks past today
+00:31 +63: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) the window and duty filters are read from the server
+00:32 +64: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes S2: with From cleared the window ends today
+00:33 +65: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) record a contact attempt
+00:34 +66: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) record a contact attempt
+00:35 +67: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes N4: an unknown outcome shows Not sent and Check again resends it
+00:36 +68: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a follow-up after the duty starts is refused before sending
+00:36 +69: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a follow-up after the duty starts is refused before sending
+00:36 +70: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a follow-up after the duty starts is refused before sending
+00:37 +71: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the duty history the member's cell parts are listed with a kind filter
+00:37 +72: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+00:38 +73: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+00:38 +74: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+00:38 +75: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+00:39 +76: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+00:39 +77: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+00:39 +78: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+00:41 +79: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+00:41 +80: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+00:41 +81: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+00:42 +82: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: staff web rota a date shows its event; the picker links a published one
+00:44 +83: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: staff web rota a date shows its event; the picker links a published one
+00:46 +84: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: staff web rota a date shows its event; the picker links a published one
+00:47 +85: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: review fixes S2: no contact work on the leader's own duty
+00:48 +86: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: staff web rota a date names its published event; a failed list says so
+00:48 +87: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: review fixes N7: a malformed From date is an error, not today
+00:49 +88: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: mobile duty detail the duty shows its event and opens it
+00:49 +89: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (Pastor and Admin: nothing private) Pastor: church-wide gaps, read only
+00:49 +90: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: mobile duty detail an event no longer public, and a failed read, say so
+00:49 +91: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (Pastor and Admin: nothing private) Admin without the scope: manage, never contact
+00:50 +92: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: mobile duty detail a duty with no event shows none
+00:50 +93: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: mobile duty detail a duty with no event shows none
+00:50 +94: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: labels elsewhere the board says Confirmed by leader and Cancelled
+00:50 +95: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: staff web Events the editor sees the linked duties before a change
+00:50 +96: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_event_links_test.dart: staff web Events the editor sees the linked duties before a change
+00:51 +97: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader works the cell's parts, named from the Cells read, with no reassign
+00:51 +98: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader works the cell's parts, named from the Cells read, with no reassign
+00:51 +99: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader works the cell's parts, named from the Cells read, with no reassign
+00:52 +100: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell keeps a plain name when the Cells read is refused
+00:52 +101: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader sees Needs attention
+00:53 +102: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader sees Needs attention
+00:53 +103: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader sees Needs attention
+00:53 +104: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) the board shows the reason line to a leader
+00:54 +105: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) the board shows the reason line to a leader
+00:54 +106: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) the board shows the reason line to a leader
+00:55 +107: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +108: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +109: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +110: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +111: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +112: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +113: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: the vacancy reason (owner item 8) no reason line when the server sends none
+00:56 +114: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments adds SYNTHETIC Preaching Rota
+00:57 +115: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments adds SYNTHETIC Preaching Rota
+00:57 +116: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments adds SYNTHETIC Preaching Rota
+00:57 +117: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments adds SYNTHETIC Preaching Rota
+00:58 +118: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments adds SYNTHETIC Preaching Rota
+00:59 +119: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_decisions_test.dart: removing the last reachable leader or deputy (owner item 10) Roles & access explains the refusal
+00:59 +120: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments a leader is an Identity scope grant; members join by revision
+01:00 +121: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: Admin departments a leader is an Identity scope grant; members join by revision
+01:01 +122: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board publishes one duty with a deadline, then shows Accepted
+01:01 +123: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board publishes one duty with a deadline, then shows Accepted
+01:01 +124: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board publishes one duty with a deadline, then shows Accepted
+01:01 +125: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board publishes one duty with a deadline, then shows Accepted
+01:01 +126: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board publishes one duty with a deadline, then shows Accepted
+01:05 +127: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid drafts, the accessible list and Publish N draft slots
+01:06 +128: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board an end past midnight and a reporting time are church time
+01:08 +129: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a published date shows 2 of 3 confirmed; give a position
+01:08 +130: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_test.dart: staff web: leader board times are shown in church time
+01:08 +131: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:09 +132: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:09 +133: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:09 +134: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:11 +135: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:12 +136: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:12 +137: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:12 +138: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:12 +139: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:12 +140: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid change this and later dates, then cancel one date
+01:14 +141: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a refused answer-by shows on the lead picker
+01:14 +142: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a refused answer-by shows on the lead picker
+01:14 +143: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a refused answer-by shows on the lead picker
+01:14 +144: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a refused answer-by shows on the lead picker
+01:14 +145: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a refused answer-by shows on the lead picker
+01:14 +146: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a refused answer-by shows on the lead picker
+01:15 +147: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:17 +148: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:17 +149: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:18 +150: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:19 +151: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:19 +152: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:19 +153: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders no answer-by time and two chosen reminders
+01:19 +154: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_rota_test.dart: staff web: the rota grid a new rota is generated as drafts
+01:21 +155: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders a refused reminder list says so
+01:21 +156: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: publishing with the defaults or chosen reminders a refused reminder list says so
+01:22 +157: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: Short notice, Needs contact and changing reminders the board flags direct contact and lists it
+01:23 +158: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: Short notice, Needs contact and changing reminders the board flags direct contact and lists it
+01:23 +159: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: Short notice, Needs contact and changing reminders the board flags direct contact and lists it
+01:23 +160: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: Short notice, Needs contact and changing reminders the board flags direct contact and lists it
+01:23 +161: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: mobile: a cell part in My duties shows the cell programme and its leaders and can be accepted
+01:24 +162: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: mobile: a cell part in My duties shows the cell programme and its leaders and can be accepted
+01:25 +163: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: mobile: a cell part in My duties shows the cell programme and its leaders and can be accepted
+01:25 +164: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: review fixes the reminders editor keeps a refusal visible; Cancel resets
+01:26 +165: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: review fixes the reminders editor keeps a refusal visible; Cancel resets
+01:26 +166: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: review fixes the reminders editor keeps a refusal visible; Cancel resets
+01:26 +167: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: staff web: a linked department duty and its review the leader sees the review and marks it reviewed
+01:27 +168: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: staff web: a linked department duty and its review the leader sees the review and marks it reviewed
+01:28 +169: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: staff web: a linked department duty and its review the leader sees the review and marks it reviewed
+01:28 +170: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota the grid marks Short notice and Needs contact
+01:28 +171: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: staff web: a linked department duty and its review a review someone else cleared first reloads
+01:29 +172: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota reminders for this and later dates use the series
+01:29 +173: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_owner_ops_test.dart: staff web: a linked department duty and its review oversight sees the review but cannot mark it
+01:29 +174: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:29 +175: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +176: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +177: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +178: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +179: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +180: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +181: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +182: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:30 +183: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_reminders_test.dart: staff web: rota a new rota carries the chosen reminders
+01:31 +184: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:31 +185: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:32 +186: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:32 +187: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:32 +188: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:32 +189: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:32 +190: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duties (mobile) a due date reads "Due 30 Nov" on the row and the duty
+01:33 +191: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: My duties segments carry counts and their own empty copy; a failed read is not empty
+01:34 +192: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: My duties segments carry counts and their own empty copy; a failed read is not empty
+01:35 +193: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: at phone width (390 px) the row and the duty fit
+01:35 +194: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: My duties Can't make it: Cancel sends nothing; the note goes with the answer
+01:37 +195: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) what needs the Pastor comes first, with its one action
+01:37 +196: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: My duties detail: Can't make it anymore after accepting; Not sent until the server answers; Check again keeps the request id
+01:38 +197: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) give a special assignment with a due date
+01:39 +198: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) give a special assignment with a due date
+01:39 +199: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) give a special assignment with a due date
+01:41 +200: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: My duties bulk: select three of four dates, confirm the dates, one all-or-nothing request
+01:41 +201: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) a Pastor cannot give one to themselves (explained)
+01:42 +202: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) a Pastor cannot give one to themselves (explained)
+01:42 +203: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) a Pastor cannot give one to themselves (explained)
+01:43 +204: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) a Pastor cannot give one to themselves (explained)
+01:43 +205: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: Home My duties card the seal sits wide while a duty waits, in the corner once nothing does
+01:43 +206: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) change a due date, then cancel
+01:44 +207: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) change a due date, then cancel
+01:45 +208: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_responses_test.dart: Home My duties card Can't make it from Home opens the sheet
+01:45 +209: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) review section 8: after a conflict the open form offers the latest version instead of resending its old revision
+01:45 +210: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) review section 8: after a conflict the open form offers the latest version instead of resending its old revision
+01:45 +211: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) review section 8: after a conflict the open form offers the latest version instead of resending its old revision
+01:46 +212: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) review section 8: after a conflict the open form offers the latest version instead of resending its old revision
+01:46 +213: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) review section 8: after a conflict the open form offers the latest version instead of resending its old revision
+01:46 +214: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) Confirmed by the Pastor for a member reached by phone
+01:47 +215: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) giving sits in the page header; the phone keeps it inline
+01:48 +216: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) giving sits in the page header; the phone keeps it inline
+01:48 +217: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) giving sits in the page header; the phone keeps it inline
+01:48 +218: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) giving sits in the page header; the phone keeps it inline
+01:48 +219: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) giving sits in the page header; the phone keeps it inline
+01:48 +220: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) giving sits in the page header; the phone keeps it inline
+01:48 +221: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_refactor_sweep_test.dart: resendOrNewRequest any other input is a new request
+01:48 +222: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: the Pastors' screen (staff web) anyone but a Pastor is refused by the server
+01:48 +223: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_special_test.dart: My duty history the Special filter is offered with another kind
+01:49 +224: All tests passed!
+
+finished_utc: 2026-10-30T19:53:25.847176+00:00
+exit_code: 0

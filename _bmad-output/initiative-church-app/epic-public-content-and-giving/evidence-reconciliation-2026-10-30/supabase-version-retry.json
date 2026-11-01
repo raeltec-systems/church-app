@@ -1,0 +1,11 @@
+{
+  "name": "supabase-version-retry",
+  "command": "npx --no-install supabase --version",
+  "cwd": ".",
+  "head": "46debe04fe8ba4ca0f7bc639e9ba60c41f57cb19",
+  "started_utc": "2026-10-30T19:30:33.243829+00:00",
+  "finished_utc": "2026-10-30T19:30:34.098309+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/supabase-version-retry.log"
+}

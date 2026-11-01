@@ -1,0 +1,28 @@
+command: npm run contracts:test
+cwd: .
+head: c96cd562b2650c37f5d3d879cb12891419700139
+started_utc: 2026-10-30T19:29:09.505743+00:00
+
+
+> contracts:test
+> node --test packages/contracts/ts/contracts.test.ts
+
+TAP version 13
+# Subtest: packages/contracts/ts/contracts.test.ts
+ok 1 - packages/contracts/ts/contracts.test.ts
+  ---
+  duration_ms: 180.75741
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 189.481538
+
+finished_utc: 2026-10-30T19:29:09.855860+00:00
+exit_code: 0

@@ -24,6 +24,7 @@
 // sys_audit rows stay).
 //
 // Usage: node tools/identity-e2e/worker.mjs [--evidence <file.jsonl>]
+import { removeLocalEdgeRuntime } from '../auth-harness/local-target.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -344,7 +345,7 @@ async function main() {
     try { process.kill(-serve.pid, 'SIGINT'); } catch { /* already gone */ }
     await sleep(3000);
     try { process.kill(-serve.pid, 'SIGKILL'); } catch { /* already gone */ }
-    try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+    try { removeLocalEdgeRuntime(); } catch { /* not running */ }
     rmSync(work, { recursive: true, force: true });
     resetScheduler();
     const left = cleanup();

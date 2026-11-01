@@ -1,0 +1,54 @@
+{
+  "checked_utc": "2026-10-30T19:57:57.383084+00:00",
+  "source_baseline": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "current_head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "tracked_diff_paths": [],
+  "tree_objects": [
+    {
+      "path": "apps",
+      "source_object": "5d6f3a13d6d154f8c0cdd033840a482137c9a8e7",
+      "current_object": "5d6f3a13d6d154f8c0cdd033840a482137c9a8e7",
+      "equal": true
+    },
+    {
+      "path": "packages",
+      "source_object": "76e01bd8df461a805c4248e787e7502a39dadad5",
+      "current_object": "76e01bd8df461a805c4248e787e7502a39dadad5",
+      "equal": true
+    },
+    {
+      "path": "supabase",
+      "source_object": "ad44bf9f68e02c56ca7df64b167051e690b05878",
+      "current_object": "ad44bf9f68e02c56ca7df64b167051e690b05878",
+      "equal": true
+    },
+    {
+      "path": "tools",
+      "source_object": "a766fe15e092b3473cd6e306531678176e4f1404",
+      "current_object": "a766fe15e092b3473cd6e306531678176e4f1404",
+      "equal": true
+    },
+    {
+      "path": "package.json",
+      "source_object": "be734de0f11605fa95bde67787383333f7027d60",
+      "current_object": "be734de0f11605fa95bde67787383333f7027d60",
+      "equal": true
+    },
+    {
+      "path": "package-lock.json",
+      "source_object": "9cb7d1f443fecccc713f070ed945616b219517cd",
+      "current_object": "9cb7d1f443fecccc713f070ed945616b219517cd",
+      "equal": true
+    }
+  ],
+  "mobile_isolation": "mobile-copy.json records the 116-file identical mobile copy used for pub/analyze/tests; generated Linux plugin files in the active checkout were never modified.",
+  "documentation_followup": {
+    "checked_utc": "2026-10-30T19:59:06.255757+00:00",
+    "changed_documentation_paths": [
+      "apps/mobile/README.md",
+      "apps/staff/README.md"
+    ],
+    "runtime_or_dependency_changed_paths": [],
+    "note": "Root updated the mobile/staff READMEs after the source-tree snapshot; no executable source, dependency or config changed."
+  }
+}

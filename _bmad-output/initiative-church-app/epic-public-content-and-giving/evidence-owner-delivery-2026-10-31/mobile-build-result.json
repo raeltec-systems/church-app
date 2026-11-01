@@ -1,0 +1,12 @@
+{
+    "source":  "33e97b2c4443578a0a86a92c02014b5730048bbd",
+    "environment":  "staging",
+    "started_at_utc":  "2026-10-31T10:15:56.5387580Z",
+    "finished_at_utc":  "2026-10-31T10:19:26.6041887Z",
+    "exit":  0,
+    "push_config_included":  false,
+    "signing":  "existing debug signer; owner testing only",
+    "build_number":  2026103101,
+    "sha256":  "948845752c3f853f882853720471e35909dc9cb47c70f07a07aa3b25358603cd",
+    "bytes":  73956657
+}

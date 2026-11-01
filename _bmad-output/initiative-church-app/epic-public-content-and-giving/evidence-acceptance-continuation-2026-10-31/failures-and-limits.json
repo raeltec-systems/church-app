@@ -1,0 +1,66 @@
+{
+  "initial_windows_suites": "Preserved by hash. CRLF fixture comparisons and Windows shell/path or permission assumptions failed; see later retries, not a retroactive pass.",
+  "offline_retry": {
+    "head": "c3b633ddc23bf65776cb52d978b2b6654cb930e8",
+    "total": 436,
+    "passed": 433,
+    "failed": 3,
+    "failures": [
+      "scan-evidence.test.mjs: three Bash calls use /C:/Users/... which the selected Bash cannot open; exit 127."
+    ]
+  },
+  "policy_retry": {
+    "head": "c3b633ddc23bf65776cb52d978b2b6654cb930e8",
+    "total": 56,
+    "passed": 55,
+    "failed": 1,
+    "failures": [
+      "system-credential.test.mjs: Windows file mode 0666 (438) does not equal POSIX 0600 (384). No production credential was minted for this test."
+    ]
+  },
+  "dart_vm_initial": {
+    "total": 284,
+    "passed": 283,
+    "failed": 1,
+    "failure": "CRLF working-tree representation of the embedded fixture differs from LF generator output. No fixture contents were changed.",
+    "retry": "contracts-vm-lf-retry-result.json: 284/284 passed"
+  },
+  "sermon_lock_initial": {
+    "head": "ed73982483c45b67894f8fb0722d8ea0df4d60a5",
+    "passed": 12,
+    "total": 13,
+    "failure": "The new reassignment fixture used slot_changes, not the supported single-duty member_id payload. The provider refused with validation_failed, so no reassignment occurred.",
+    "retry": "c3b633d: 13/13 passed after correcting the test payload; no application change."
+  },
+  "deletion_initial": {
+    "head": "c3b633ddc23bf65776cb52d978b2b6654cb930e8",
+    "result": "run-failed before scenarios",
+    "failure": "spawn npx ENOENT on Windows. The existing test launcher was changed to the pinned local CLI on 8ed2387."
+  },
+  "deletion_without_mail": {
+    "head": "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "passed": 11,
+    "total": 12,
+    "failure": "D10 email-change fixture returned HTTP 500 and created no one-time token because Mailpit was excluded. Both session denials, actual erasure, worker resume and restore assertions passed within this failed overall run. Mail-enabled retry is a separate observation."
+  },
+  "signed_in_browser": {
+    "result": "blocked",
+    "failure": "The tool safety check blocked authoring/running the proposed signed-in browser harness. No alternate route was attempted. No signed-in browser or native user journey is counted as passed."
+  },
+  "independent_review": {
+    "result": "not-run",
+    "scope": "Rendered BMAD quick review and staged continuation diff/claims. Step 1 requires confirmation; independent subagents are unavailable. Historical quick review does not cover these new changes."
+  },
+  "deletion_mail_reset_transient": {
+    "head": "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "result": "run-failed before assertions",
+    "failure": "fetch failed after local reset; owned users, credential and principal cleaned."
+  },
+  "deletion_final": {
+    "head": "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "result": "run-passed",
+    "total": 12,
+    "passed": 12,
+    "evidence": "identity-deletion-with-mail-stable.jsonl"
+  }
+}

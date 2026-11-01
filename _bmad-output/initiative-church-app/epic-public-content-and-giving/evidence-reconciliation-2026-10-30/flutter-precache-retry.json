@@ -1,0 +1,11 @@
+{
+  "name": "flutter-precache-retry",
+  "command": "flutter precache --web --linux --no-android --no-ios --no-windows --no-macos --no-fuchsia",
+  "cwd": ".",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:38:01.972266+00:00",
+  "finished_utc": "2026-10-30T19:38:11.225193+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/flutter-precache-retry.log"
+}

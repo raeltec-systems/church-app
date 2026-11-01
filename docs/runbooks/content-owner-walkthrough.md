@@ -2,6 +2,10 @@
 
 Prepared 30 October 2026. **This is a runnable acceptance procedure, not a record of a passed pilot.** Use it with [the acceptance reconciliation](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/acceptance-reconciliation-2026-10-30.md), [Content's operator reference](content.md), and [the promotion runbook](production-promotion-content.md). Stories 6.15 and 6.17 remain open until their actual evidence and owner decisions exist.
 
+Current owner direction is recorded in [the 2 November decisions](epic-6-owner-decisions-2026-11-02.md): prepare the Galaxy A26 package and run the staff frontend locally, both connected to existing hosted staging, with coherent fictional/SAMPLE fixtures there; complete the accepted Epic 6 capabilities before launch. No completed Android/iOS pilot, notification permission or production approval is implied.
+
+For this hosted-staging pilot, skip the local database reset, bootstrap, auth-harness and grant-backdating examples below. Those are retained only for a deliberately isolated local reproduction. Use the current delivery's hosted staging URL/key and approved scoped fixture operations; preserve existing real staging rows.
+
 ## 1. Prepare the candidate and record the environment
 
 On Windows use Git Bash with Docker Desktop's Linux engine running; on macOS/Linux use Bash and Docker. Android needs an SDK/emulator or a USB-debuggable phone. iOS needs macOS, Xcode and a simulator or provisioned device. Use **Node 22, Flutter 3.47.6 / Dart 3.13.5, and the locked Supabase CLI 2.119.0**. Do not silently use another Flutter version.
@@ -25,9 +29,11 @@ mkdir -p /tmp/church-content-owner-evidence
 
 Record the full SHA, date, OS, device/browser versions, app build, environment and tester in the result sheet below. The candidate must be reviewed again if its application/server code changes. Never put passwords, session tokens, provider credentials, device tokens or real contacts in committed evidence.
 
-## 2. Run the automated baseline before building pilot fixtures
+## 2. Carry forward the baseline; rerun affected checks only
 
-The aggregate runner **resets the local database**, and restores generated Linux Flutter files at its end. Use the clean dedicated checkout only. It continues after individual failures; its final `done` line or exit code is not an all-pass verdict.
+The [31 October continuation](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-acceptance-continuation-2026-10-31/README.md) already records passing local RSVP (13/13), retention (6/6) and actual sermon-lock (13/13) checks. The staging history repair is verified closed. Full CI passed at `33e97b2` ([41187112542](https://github.com/raeltec-systems/church-app/actions/runs/41187112542)) and the documentation/delivery head `6f5cfe7` ([41192736400](https://github.com/raeltec-systems/church-app/actions/runs/41192736400)). Preserve each result's original source and environment; a later APK has its own recorded build source. Run only checks justified by relevant changes or a distinct unmet acceptance requirement. The commands below are reproduction instructions, not an instruction to repeat completed checks.
+
+If a new isolated replay is justified, the aggregate runner **resets the local database**, and restores generated Linux Flutter files at its end. Use the clean dedicated checkout only. It continues after individual failures; its final `done` line or exit code is not an all-pass verdict.
 
 ```bash
 npm run ci:policy-test
@@ -58,7 +64,7 @@ Keep the aggregate script's `UNRUN` entry and attach the separate result. Real n
 
 ### Real RSVP and retention integrations
 
-Run these before creating the persistent UI pilot accounts. The runners own fictional identities and may remove their fixtures. They refuse a remote target and obtain local keys internally; do not supply staging credentials or relax their guards.
+If affected server/function changes justify another integration run, run it before creating persistent UI pilot accounts. The runners own fictional identities and may remove their fixtures. They refuse a remote target and obtain local keys internally; do not supply staging credentials or relax their guards.
 
 ```bash
 npx supabase start
@@ -74,11 +80,11 @@ node tools/identity-e2e/content-retention.mjs --evidence /tmp/church-content-own
 bash tools/auth-harness/scan-evidence.sh /tmp/church-content-owner-evidence
 ```
 
-Expected: RSVP **13/13**, including one winner/four Full responses in the first five-client race and one winner/three Full responses in the second four-client race; retention **6/6**, including actual scheduler → worker → Storage removal and retained recent/referenced files. An interruption always requires `node tools/auth-harness/local-phone-auth.mjs off`. These are real integrations; the corresponding `*.test.mjs` files are offline unit tests and cannot replace them. The existing 28 October results remain historical evidence.
+Expected: RSVP **13/13**, including one winner/four Full responses in the first five-client race and one winner/three Full responses in the second four-client race; retention **6/6**, including actual scheduler → worker → Storage removal and retained recent/referenced files. An interruption always requires `node tools/auth-harness/local-phone-auth.mjs off`. These are real integrations; the corresponding `*.test.mjs` files are offline unit tests and cannot replace them. The 28 October results remain historical; the 31 October continuation supplies the newer passing runs. A normal-client cancellation correction does not by itself require repeating the backend capacity race or Storage retention run.
 
 ## 3. Start the actual clients
 
-For an isolated local pilot, reset once after the automated suites, then keep that database for the whole walkthrough:
+For a newly created disposable local pilot, initialise its deliberately isolated database once, then keep it for the whole walkthrough. Do not reset an existing shared or persistent pilot stack or repeat the completed suites solely to create fixtures:
 
 ```bash
 npx supabase db reset --local
@@ -226,7 +232,7 @@ All rows below start **authored only**. Fill a result and evidence reference for
 | UI-07 Media/guest | Publish a church-owned poster/banner, save public content, then withdraw it or its rights; guest refreshes and restarts. Throttle or fail image requests. | Public reads remove withdrawn items; successful refresh evicts saved rows/files without stale resurrection. Slow/failed/oversized images leave text usable. Already offline copies cannot be remotely erased. | Rights/public state, refresh and restart evidence |
 | UI-08 Member/guest | Calendar → conference → **Add to calendar** → actual phone calendar. | Start 13 November and end 15 November survive; timezone and both endpoints are correct; copy caveat is visible. Returning to app works. | Calendar-app view showing both endpoints and timezone |
 | UI-09 Abel/Esther | Both open a capacity-one variant of Youth fellowship, submit concurrently, refresh, winner cancels, loser retries. | Exactly one current attendee; other sees Full; cancel frees the place. Repeat/uncertain submission never double-books. Cross-check with the real G1 runner. | Two-client recording + counts/results |
-| UI-10 Admin/organiser/member | Staff Content → Events → **Who's coming**; compare organiser, other Media, Admin and plain member. Deactivate a future attendee in the local fixture. | Only organiser/Admin gets names; other readers get counts only. Deactivation frees future RSVP. Record the known limitation: RSVP cancellation is unavailable while RSVP is disabled. | Allowed/denied results and released count |
+| UI-10 Admin/organiser/member | Staff Content → Events → **Who's coming**; compare organiser, other Media, Admin and plain member. Deactivate a future attendee in the local fixture. | Only organiser/Admin gets names; other readers get counts only. Deactivation frees future RSVP. On the corrected candidate, an existing eligible attendee can cancel before start even when new RSVPs are disabled; a member without an RSVP cannot join. Record the exact build and observed result. | Allowed/denied results and released count |
 | UI-11 Member/Pending/guest | Member Calendar → My duties / My cell → open items; switch to Esther, Lydia, then guest. | Only current user's duties and confirmed cell meetings appear; Pending/guest switches absent; no private overlay survives sign-out or enters public cache. Failed protected load differs from no items. | Role-switch and deep-link denial recording |
 | UI-12 Leader/Media | Staff rota date → link Sunday event; Media sees linked count and changes event time/place or withdraws it. | Leaders get review flag; no duty republish or answer reset. On staging this can send notices: run only after explicit authorization for every affected test recipient. | Before/after duty revision and answer, intended notice counts |
 | UI-13 Assignee/leader/Media | Abel Home → My duties → duty → **Send to Media**; repeat; Media → Sermons opens **From a duty**, completes and publishes. | One private snapshot draft; no automatic publication or private duty fields. Wrong/revoked sender refused. A later send returns the existing draft; Media edits it. | Sender route, draft privacy, editor route and explicit publish |
@@ -253,7 +259,7 @@ All rows below start **authored only**. Fill a result and evidence reference for
 
 ## 6. Real sermon-from-duty contention gate
 
-The actual database/HTTP concurrency check now has a runnable local driver. It uses independent transactions, verifies actual advisory-lock waiters, and exercises reassignment, cancellation, revoked scope and duplicate sends. It changes no application function to manufacture the race. Run before persistent pilot fixtures; keep phone auth enabled only for the run:
+The actual database/HTTP concurrency driver passed 13/13 on `c3b633d`, as recorded in the [31 October continuation](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-acceptance-continuation-2026-10-31/README.md). It uses independent transactions, verifies actual advisory-lock waiters, and exercises reassignment, cancellation, revoked scope and duplicate sends without replacing an application function. This closes the local backend contention evidence gap. The commands below are for a justified affected-code reproduction only; run before persistent pilot fixtures and keep phone auth enabled only for the run:
 
 ```bash
 node tools/auth-harness/local-phone-auth.mjs on
@@ -265,9 +271,9 @@ node tools/auth-harness/local-phone-auth.mjs off
 Expected: **13/13**, including four `DL11`-`DL14` real-contention checks and zero remaining fixture users/items. If interrupted, still turn the local phone switch off. This proves the backend race; it does not replace the normal-UI two-session walkthrough below or the owner's device sign-off.
 
 
-The pgTAP stale-first-read wrapper is useful, but it does not demonstrate two live sessions waiting on a lock. This remains **unverified** until the following controlled local exercise is witnessed. It is not a proven product defect.
+The completed real database/HTTP contention evidence establishes the backend lock behavior. The optional manual exercise below observes the normal clients' refusal and recovery presentation; it does not reopen the completed backend concurrency gate. Its UI observations remain unrecorded until actually witnessed.
 
-Prepare a distinct published fictional preaching duty with a topic or scripture for each case through the app. Keep its assignee and manager screens open before beginning. Use Abel as the assignee and John as the department leader; John must not also be that duty's assignee, deputy or an Admin for the manager-revocation case.
+Prepare a distinct published fictional preaching duty with a topic or scripture for each case through the app. For cancellation, use a single-position duty matching the passed DL12 fixture, so cancelling that slot leaves the tested duty unavailable. Keep its assignee and manager screens open before beginning. Use Abel as the assignee and John as the department leader; John must not also be that duty's assignee, deputy or an Admin for the manager-revocation case.
 
 The route `/duties/assignments/<id>` contains an **assignment ID**, not an occurrence ID. Do not use it directly as the lock key. Open two local `psql` sessions with:
 
@@ -330,15 +336,15 @@ Before starting the **manager-revocation** case, use Grace's **Roles & access** 
 
 Before releasing A, use Grace's separate authorized staff session to commit the corresponding change, one case per fresh duty:
 
-| Case | Waiting sender | Committed provider change | Recovery sender after refusal |
+| Case | Waiting sender | Committed provider change | Subsequent sender/check after refusal |
 | --- | --- | --- | --- |
 | Reassignment | Abel, current assignee | Reassign the same slot to Esther in the rota | Esther, now the assignee |
-| Cancellation | Abel, current assignee | Cancel Abel's slot in the rota | John, still the authorized department leader |
+| Cancellation | Abel, current assignee | Cancel Abel's sole slot in the rota | John attempts as department leader; expect `not_found` and zero drafts for the cancelled fixture |
 | Manager revocation | John, department leader only for this occurrence; Peter is already a reachable deputy | Revoke John's department-leader scope through Roles & access; require a successful result and confirm the grant ended | Abel, still the current assignee |
 
 Confirm the provider change succeeded and reload it in staff before releasing A. If revocation returns `handover_required`, record the refusal, safely release the diagnostic lock and correct the eligible-deputy setup before using a fresh duty; do not expect post-lock denial from a grant that remained active. If the provider action itself waits, record the blocking graph and stop the scenario; do not fabricate a commit or a pass. Prepare the provider dialog in advance and work within the actual request timeout. If the sending request times out before the committed change and lock release, that attempt has not demonstrated the post-lock authorization check; record it and repeat with controlled timing, without changing shared server timeouts.
 
-Run `commit;` in A. Expected: the waiting old actor is refused (`not_found`, presented as **Only the person on this duty or its leaders can send it.**) and no Content draft was created. In B, check the count before the permitted recovery sender acts, and again after that sender succeeds:
+Run `commit;` in A. Expected: the waiting old actor is refused (`not_found`, presented as **Only the person on this duty or its leaders can send it.**) and no Content draft was created. In B, check the count before and after the subsequent request identified in the table:
 
 ```sql
 select count(*) as drafts_for_occurrence
@@ -346,7 +352,7 @@ from app.content_sermon_duty_drafts
 where occurrence_id = :'occurrence_id'::uuid;
 ```
 
-The count must be zero after refusal and one after permitted recovery. Inspect the private draft as Media and confirm it was not published. Before the final case, restore John's department-leader scope through the Admin UI and sign him in again after the trust-epoch margin. On another fresh duty, hold the same occurrence lock, start Abel's and John's still-authorized sends, observe both waiters blocked by A, and release A. Both successful command responses must refer to the same single draft; the occurrence count must be one. Capture sanitized outcomes and IDs only, without request headers.
+The count must be zero after the old sender's refusal. For reassignment, Esther's authorised request then creates one private draft; for manager revocation, Abel's authorised request creates one. For cancellation, John's later request is also refused with `not_found` and the count remains zero. Inspect a private draft as Media only where an authorised recovery created one, and confirm it was not published. Before the final case, restore John's department-leader scope through the Admin UI and sign him in again after the trust-epoch margin. On another fresh duty, hold the same occurrence lock, start Abel's and John's still-authorized sends, observe both waiters blocked by A, and release A. Both successful command responses must refer to the same single draft; the occurrence count must be one. Capture sanitized outcomes and IDs only, without request headers.
 
 Capture the actual lock wait, committed provider change, command outcome and private-draft count. Do not capture authorization headers. Always `rollback;` any remaining diagnostic transaction. This procedure is authored; no two-session result was produced by writing it.
 
@@ -368,7 +374,7 @@ Evidence file(s), sanitized:
 Missing tool/input or required decision:
 ```
 
-For failures record reproducible steps, expected/actual result and whether the user can finish by an approved route. A missing button/backend workflow is **unfinished functionality**; a supported flow not exercised on a device is **unverified functionality**. Keep these lists separate. Report the known RSVP-disabled cancellation and snapshot/special-duty limitations explicitly rather than implying they are newly accepted.
+For failures record reproducible steps, expected/actual result and whether the user can finish by an approved route. A missing button/backend workflow is **unfinished functionality**; a supported flow not exercised on a device is **unverified functionality**. Keep these lists separate. Use the [recorded product dispositions](epic-6-owner-decisions-2026-11-02.md): verify the required RSVP-disabled cancellation correction, and retain the accepted snapshot, special-duty and other scope limits in the result rather than claiming additional functionality.
 
 Compare the touched/visited screens with the [binding design contract](../../_bmad-output/initiative-church-app/spec-church-app/design-contract.md), the supplied Home/Bible/hymn/Sermons/Give/Calendar references, and shared `packages/design_system`: correct emblem, Outfit/Figtree hierarchy, navy/blue palette, five tabs, readable status text, light/dark mobile, keyboard focus and accessible targets. No UI or token was changed by this reconciliation; running this walkthrough is still necessary to establish end-user fidelity.
 

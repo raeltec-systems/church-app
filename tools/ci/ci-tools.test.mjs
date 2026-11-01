@@ -237,9 +237,20 @@ test('promotion deploys every configured Edge Function to the guarded ref before
     'order must be migrations, hosted verification, functions, then clients');
   const deployBlock = workflow.slice(deployAt, buildAt);
   assert.match(deployBlock, /functions deploy "\$function"/);
-  for (const name of ['identity-assisted-recovery', 'identity-deletion', 'notifications-worker']) {
-    assert.ok(deployBlock.includes(name), `workflow must deploy ${name}`);
-  }
+  const config = readFileSync(new URL('../../supabase/config.toml', import.meta.url), 'utf8');
+  const enabledFunctions = config.split(/(?=^\[)/m).flatMap((section) => {
+    const name = /^\[functions\.([a-z0-9_-]+)\][ \t]*(?:#.*)?\r?$/m.exec(section)?.[1];
+    if (!name) return [];
+    const enabled = /^[ \t]*enabled[ \t]*=[ \t]*(true|false)[ \t]*(?:#.*)?\r?$/m.exec(section)?.[1];
+    assert.ok(enabled, `${name} must explicitly declare enabled for the promotion inventory`);
+    return enabled === 'true' ? [name] : [];
+  });
+  assert.ok(enabledFunctions.length > 0, 'the configured function inventory must not be empty');
+  const deployLoop = /^[ \t]*for function in ([a-z0-9_\- \t]+);[ \t]*do[ \t]*\r?$/m.exec(deployBlock);
+  assert.ok(deployLoop, 'the guarded deployment must enumerate its function names');
+  const deployedFunctions = deployLoop[1].trim().split(/\s+/);
+  assert.deepEqual(deployedFunctions.sort(), enabledFunctions.sort(),
+    'promotion must deploy exactly the enabled functions from supabase/config.toml');
   assert.match(deployBlock, /--project-ref "\$\{\{ steps\.target\.outputs\.ref \}\}"/);
   assert.match(deployBlock, /--no-verify-jwt/);
 });

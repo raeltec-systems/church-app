@@ -475,6 +475,8 @@ class EventDetailScreen extends ConsumerWidget {
     final layout = ChurchLayout.of(context);
     final s = ref.watch(publicEventProvider(eventId));
     final ctl = ref.read(publicEventProvider(eventId).notifier);
+    final signedIn =
+        ref.watch(accountProvider.select((s) => s.accountId)) != null;
     final children = <Widget>[];
     switch (s.result) {
       case null:
@@ -538,7 +540,10 @@ class EventDetailScreen extends ConsumerWidget {
               'Times are church time (Kafue).',
               style: ChurchType.secondary.copyWith(color: c.muted),
             ),
-            if (rsvp != null) ...[
+            // Turning new RSVPs off does not cancel a member's existing
+            // place. Ask for their own RSVP even without public counts, but
+            // never derive protected actions from the saved public snapshot.
+            if (rsvp != null || (!s.offlineSnapshot && signedIn)) ...[
               const SizedBox(height: ChurchGeometry.sectionGap),
               _EventRsvpSection(event: event, rsvp: rsvp),
             ],
@@ -644,7 +649,7 @@ class _EventRsvpSection extends ConsumerWidget {
   const _EventRsvpSection({required this.event, required this.rsvp});
 
   final PublicEvent event;
-  final PublicEventRsvp rsvp;
+  final PublicEventRsvp? rsvp;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -654,7 +659,7 @@ class _EventRsvpSection extends ConsumerWidget {
         ref.watch(accountProvider.select((s) => s.accountId)) != null;
     final access = ref.watch(myAccessProvider.select((s) => s.result));
     final Widget answer;
-    if (!rsvp.open) {
+    if (!(rsvp?.open ?? event.startsAt.isAfter(DateTime.now()))) {
       answer = Text(
         'RSVP is closed: the event has started.',
         key: const Key('event-rsvp-closed'),
@@ -739,15 +744,18 @@ class _MemberRsvp extends ConsumerWidget {
   const _MemberRsvp({required this.event, required this.rsvp});
 
   final PublicEvent event;
-  final PublicEventRsvp rsvp;
+  final PublicEventRsvp? rsvp;
 
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => ChurchDialog(
         title: 'Cancel your RSVP?',
-        content: const Text(
-          'Your place is given up. If the event fills, you may not get it back.',
+        content: Text(
+          rsvp == null
+              ? 'Your place is given up. This event is not taking new RSVPs, '
+                    'so you cannot rejoin unless RSVPs reopen.'
+              : 'Your place is given up. If the event fills, you may not get it back.',
         ),
         actions: [
           FocusRing(
@@ -813,7 +821,15 @@ class _MemberRsvp extends ConsumerWidget {
             ],
           ),
         );
-      case AccessReadOk() when rsvp.full:
+      case AccessReadOk() when rsvp == null:
+        children.add(
+          Text(
+            'This event is not taking new RSVPs.',
+            key: const Key('event-rsvp-disabled'),
+            style: muted,
+          ),
+        );
+      case AccessReadOk() when rsvp?.full ?? false:
         children.add(
           Text(
             'Full: no places are left.',
@@ -863,7 +879,12 @@ class _MemberRsvp extends ConsumerWidget {
         );
     }
     if (s.notice case final n?) {
-      final (tone, text) = _rsvpNoticeText(n);
+      final (tone, text) = n == RsvpNotice.cancelled && rsvp == null
+          ? (
+              StatusTone.success,
+              'Your RSVP is cancelled. This event is not taking new RSVPs.',
+            )
+          : _rsvpNoticeText(n);
       children.addAll([
         const SizedBox(height: 8),
         Semantics(

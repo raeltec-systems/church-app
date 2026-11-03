@@ -1,0 +1,316 @@
+[
+  {
+    "path": "client-check-ledger.json",
+    "raw_bytes": 15556,
+    "raw_sha256": "5f54eca190c8889880ab8303dbb3806db290cc628a4b8ab5cb066e01ee440d5f",
+    "published_bytes": 15088,
+    "published_sha256": "906da94cf9fc7779cd4ca0206c27c82c1de40574c7fa28bd62938c1612d3d1ed",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-client-ledger.json",
+    "raw_bytes": 3955,
+    "raw_sha256": "d24c1d9c513c9bb16654c5b6d6bc53d582de4fbf57ee5fd83236500b3a2d8cbc",
+    "published_bytes": 3835,
+    "published_sha256": "1408f8a8297605b01c0200052b6b91954de9667993a10e68fcd397f848dda09f",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "corrected-runner-results.json",
+    "raw_bytes": 2075,
+    "raw_sha256": "28c4a6051ec32f891057550cad8f224502bda56fa3547500bcb92eb549722111",
+    "published_bytes": 2028,
+    "published_sha256": "1514cd1c2e12549547f56a65c9eac0e63747b981ef67a95bee6bdfa129ec911f",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "unchanged-suite-trees.json",
+    "raw_bytes": 1813,
+    "raw_sha256": "22f28820f480dce29ac4a430a84ad0f82c5a569a6ab098d889683eaf3e1cb9fc",
+    "published_bytes": 1779,
+    "published_sha256": "2605d06dafbafa6cf25941dec396dfe3c63cf06eab8145bdf5a295d465324462",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "linux-offline-policy-result.json",
+    "raw_bytes": 361,
+    "raw_sha256": "1b570a2b9c8c0ede4be6194e3d15904386e80990f4e343a36ab0ae0c4409ea94",
+    "published_bytes": 350,
+    "published_sha256": "bb0d99c494111c622232f953aa969108d73155b317a65c563362c2d9ec6b79db",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "ci-5d8a344-observation.json",
+    "raw_bytes": 40962,
+    "raw_sha256": "360897cf8f80663053a379ed8a8508b35e43e6191986578f4de1b73389b244c2",
+    "published_bytes": 20548,
+    "published_sha256": "bd27f26efab47cb6ec5d1720ff4cd055c87f440070733399a3a36cecb5b04210",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "continuation.md",
+    "raw_bytes": 4320,
+    "raw_sha256": "3e534829c0f12705de1c3404c6671e47bc2ee42e464fe0884467a59de82f163a",
+    "published_bytes": 4343,
+    "published_sha256": "c639eed737ea4a30ee2a56ced285d9b09aa3b11a42ac7fbfec36af359920901e",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only; added a two-second separation between timestamped file-creation commands"
+  },
+  {
+    "path": "client-protocol.md",
+    "raw_bytes": 3837,
+    "raw_sha256": "00171ba1b867047d13d4ae81f00f51ec946c06b90ecce0be7fa900e6b8ac6b67",
+    "published_bytes": 3837,
+    "published_sha256": "00171ba1b867047d13d4ae81f00f51ec946c06b90ecce0be7fa900e6b8ac6b67",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-core-analysis.log",
+    "raw_bytes": 97,
+    "raw_sha256": "7f4267622a9b62140e2d4c4ccefd8264c09e24b08080a95829ad5e926c432fef",
+    "published_bytes": 57,
+    "published_sha256": "70baa53f5e3e1b85f4ec12e529a7f919efcb126d8edafa487b8cba8ea4d37238",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-core-tests.log",
+    "raw_bytes": 247622,
+    "raw_sha256": "7e9bc3db4a891a355bbc6eee860b43d9d04119a5b00eae2eea05e33e918c5c5b",
+    "published_bytes": 247622,
+    "published_sha256": "7e9bc3db4a891a355bbc6eee860b43d9d04119a5b00eae2eea05e33e918c5c5b",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-staff-analysis.log",
+    "raw_bytes": 96,
+    "raw_sha256": "65b25c74b57df2f7502b70cdc79ea8e6701ab2b66a07bb857906bda792ddb17d",
+    "published_bytes": 50,
+    "published_sha256": "6bba54a26ee13a265cecb6a3f78ed4c699effd77522eda5b7365e9b57ac0e693",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-staff-tests.log",
+    "raw_bytes": 12011,
+    "raw_sha256": "6bde30eab644acc873dbaa57b8bb7487dca7c6915cbeb5e949a787a7c04dd7fa",
+    "published_bytes": 12011,
+    "published_sha256": "6bde30eab644acc873dbaa57b8bb7487dca7c6915cbeb5e949a787a7c04dd7fa",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-staff-web-build.log",
+    "raw_bytes": 941,
+    "raw_sha256": "35d591571669b1778c4ef878fff7da52aadb3f72c964e37d7c51387b0f3df76e",
+    "published_bytes": 915,
+    "published_sha256": "b74874bf4267b84eb8ac35bd2bc0968a582f26222ee2c736ae6506c5c85ae5db",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "final-android-debug-build.log",
+    "raw_bytes": 955,
+    "raw_sha256": "4ae6c8a79be6ca2012092088242873c4848f04ca15810f66e9e4e9b8c20e811d",
+    "published_bytes": 929,
+    "published_sha256": "f8c5e24cf15f4957753a424f0d0953fe646484e11a43d46dad9ebdbbb0b92c83",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "mobile-tests.log",
+    "raw_bytes": 21583,
+    "raw_sha256": "c2daa097611be1ff0dc8d85605935cbd66209bb4f25618309c1b2d12eac9e79d",
+    "published_bytes": 21583,
+    "published_sha256": "c2daa097611be1ff0dc8d85605935cbd66209bb4f25618309c1b2d12eac9e79d",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "design-tests.log",
+    "raw_bytes": 3503,
+    "raw_sha256": "c3eb361a0ccd1ce81d00fece3b27a24fac0623469f9399ea40ebb0fd8696c8d6",
+    "published_bytes": 3503,
+    "published_sha256": "c3eb361a0ccd1ce81d00fece3b27a24fac0623469f9399ea40ebb0fd8696c8d6",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "trial-tests.log",
+    "raw_bytes": 6665,
+    "raw_sha256": "aa84413d8442257949581cd155b20b3466e906b47b1614fb82f8690ecbe5d808",
+    "published_bytes": 6665,
+    "published_sha256": "aa84413d8442257949581cd155b20b3466e906b47b1614fb82f8690ecbe5d808",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "trial-web-build.log",
+    "raw_bytes": 940,
+    "raw_sha256": "6daeb25ee2cd33cd9f301042d2f992e0569d2862eb5841f5ffe61f2d19690ea5",
+    "published_bytes": 914,
+    "published_sha256": "8d7f8cbae846a94ded604c3549963efa3f1480be34e3163a15ec95ba11810a26",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "dart-contracts-pub-retry.log",
+    "raw_bytes": 1410,
+    "raw_sha256": "eab23af3b8d820ab1b54180f092d4967bd0fea9859ce93c9923c6672778c32ab",
+    "published_bytes": 686,
+    "published_sha256": "7c49ef1a3ada3d773bdeae16ae465df0477cf1e5bd7a5535d8084541471ea11e",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "dart-contracts-analyze-retry.log",
+    "raw_bytes": 76,
+    "raw_sha256": "db027b9a7700e5628f9f4f11b49b219746c42a2fa0facfa1c9d5313cfd9ac2f7",
+    "published_bytes": 35,
+    "published_sha256": "cf666b19aee4c05e7165986f38e383b0c9060b4a33719850547bc3c827441c7f",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "dart-contracts-vm-retry.log",
+    "raw_bytes": 48414,
+    "raw_sha256": "be15880dd02c3b8984250cc4cbbb7bfbbf6a3d7c19b3d6c6c43dfd3c2ba815d7",
+    "published_bytes": 23920,
+    "published_sha256": "e2671121ca080b908aba019758c93da31b66f1a33c092aadb52c0e680feda455",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "dart-contracts-chrome-retry.log",
+    "raw_bytes": 48172,
+    "raw_sha256": "972bc34d539ee1d059cbae8a5557111d5017b12b7f8d4af30ba9199ec2a54321",
+    "published_bytes": 23800,
+    "published_sha256": "0c278843206fe96112093f42c878315c5146da143e394f2079c1f7d2250fc3a2",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "linux-offline-policy.log",
+    "raw_bytes": 193124,
+    "raw_sha256": "04381df0f6a51162f742d95255fe4de1b4c8a60e2b894da2095c2ca17da32526",
+    "published_bytes": 93587,
+    "published_sha256": "ba1aa62f01e541888bf31a75009e0430d8779d57cb2dbe75c8714eb164c745b1",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "ts-contracts.log",
+    "raw_bytes": 43704,
+    "raw_sha256": "01b3b7106e94a597daf69b98d438d86a73b47adb5358d82c35be3dc862bd8cbf",
+    "published_bytes": 43704,
+    "published_sha256": "01b3b7106e94a597daf69b98d438d86a73b47adb5358d82c35be3dc862bd8cbf",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "environment-check.log",
+    "raw_bytes": 212,
+    "raw_sha256": "c43fcaa27472fffd3364a4474ae019cd76a3b92a997e3b6c06f89f7101b7a681",
+    "published_bytes": 212,
+    "published_sha256": "c43fcaa27472fffd3364a4474ae019cd76a3b92a997e3b6c06f89f7101b7a681",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "function-import-check.log",
+    "raw_bytes": 73,
+    "raw_sha256": "295754024e46af307b5299c4c01070696681128554cc0216b36e9283f2b93731",
+    "published_bytes": 73,
+    "published_sha256": "295754024e46af307b5299c4c01070696681128554cc0216b36e9283f2b93731",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "migration-immutability.log",
+    "raw_bytes": 138,
+    "raw_sha256": "af7de5a0f52a0dc4499d66aa4a1d06320a939bb3c7e6d6eea2b319d790c49676",
+    "published_bytes": 138,
+    "published_sha256": "af7de5a0f52a0dc4499d66aa4a1d06320a939bb3c7e6d6eea2b319d790c49676",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "web-bundle-scan.log",
+    "raw_bytes": 44,
+    "raw_sha256": "835648fad7bf134f6997d1a055472dde990e0481994dc23d8651ce1825aed142",
+    "published_bytes": 44,
+    "published_sha256": "835648fad7bf134f6997d1a055472dde990e0481994dc23d8651ce1825aed142",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "contracts-tests.log",
+    "raw_bytes": 115,
+    "raw_sha256": "b2039ce9f13a20e532f63de209c986679b688e59998b8f4a3bc1ffc6555296fc",
+    "published_bytes": 115,
+    "published_sha256": "b2039ce9f13a20e532f63de209c986679b688e59998b8f4a3bc1ffc6555296fc",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "contracts-chrome.log",
+    "raw_bytes": 3804,
+    "raw_sha256": "094e84a3334e3860a4f8c5950ea997b3a555afd0c17d525aa9ea5a1ac3f586f9",
+    "published_bytes": 3804,
+    "published_sha256": "094e84a3334e3860a4f8c5950ea997b3a555afd0c17d525aa9ea5a1ac3f586f9",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "staff-tests.log",
+    "raw_bytes": 14112,
+    "raw_sha256": "d8e4abd7ac314e5b3c8befb00042388a1ea85af171f1e54b910c621d2e271a8c",
+    "published_bytes": 14110,
+    "published_sha256": "6c3143c6ffeb38bb6cb6a0626622a84ee1ba23f20c6fbafdcd61d0df53046933",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "new-clients-third.log",
+    "raw_bytes": 26318,
+    "raw_sha256": "916c4e07bf9f99254f1ea5f0617ece1bf161914399ceffa1c22b064caf71adc7",
+    "published_bytes": 13991,
+    "published_sha256": "abadb408e8f716641594d9d0f373f73223e30f08803ffcce158230a1a4bfe4fe",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "new-clients-fourth.log",
+    "raw_bytes": 19406,
+    "raw_sha256": "3bedbc9cff2faf8fddb9c69573a40303651baa981b676d3d39e01468963ee9ea",
+    "published_bytes": 9651,
+    "published_sha256": "fb2386f99729e10649c8aa1a1cb09246b26a7a9f68680f67c3972c73e95703f1",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only"
+  },
+  {
+    "path": "core-analyze-second.log",
+    "raw_bytes": 934,
+    "raw_sha256": "1e0434e928af36174d217db84066b8937e3b811a92c4269aceda54fdfef358b3",
+    "published_bytes": 420,
+    "published_sha256": "8a9797a18ec0625cb8dc70f689e1287e8522b6dc823272640b1930ed4777fc21",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only; final blank lines removed"
+  },
+  {
+    "path": "core-analyze-third.log",
+    "raw_bytes": 560,
+    "raw_sha256": "849679e3052df969d484349ba2e34b4ab343c841006ef2bad463c97c6f5e586f",
+    "published_bytes": 234,
+    "published_sha256": "b80f610fd62efa614bd06a4b3d2eeeecb4c5f26a17bb5e7ca5aacc5cecedc80a",
+    "transformation": "UTF-16/BOM decoding when present; UTF-8/LF publication; trailing whitespace only; final blank lines removed"
+  },
+  {
+    "path": "screenshots/setup-desktop.png",
+    "published_bytes": 36409,
+    "published_sha256": "ca653808cff4dbb5251cf751a4635568d71a07c9f950a52dc605e6d37d41d540",
+    "transformation": "none",
+    "scope": "Widget render from fake-port tests; not hosted authentication or phone acceptance"
+  },
+  {
+    "path": "screenshots/setup-narrow-large-text.png",
+    "published_bytes": 46870,
+    "published_sha256": "831a2464f148055869d5b4f3639516fa9cb2d45738825d732171c93681a4b6be",
+    "transformation": "none",
+    "scope": "Widget render from fake-port tests; not hosted authentication or phone acceptance"
+  },
+  {
+    "path": "screenshots/users-narrow-large-text.png",
+    "published_bytes": 64343,
+    "published_sha256": "41e65fd2e2bfbb100c03d35d9ea24b6846c60c255b2bd41a7292f44fb28c63f6",
+    "transformation": "none",
+    "scope": "Widget render from fake-port tests; not hosted authentication or phone acceptance"
+  },
+  {
+    "path": "screenshots/users-selected-person.png",
+    "published_bytes": 144778,
+    "published_sha256": "c8dec347748bb9805f89afb4a20d29c12636b7ebedcaac894adbc91f115ea5e5",
+    "transformation": "none",
+    "scope": "Widget render from fake-port tests; not hosted authentication or phone acceptance"
+  },
+  {
+    "path": "final-bundle-scan.json",
+    "published_bytes": 357,
+    "published_sha256": "53d244af89b9e0fa4fb7ef14c3b61b7c0d5b136e1f7cd597f301e72fa38fb4d5",
+    "transformation": "generated from actual command result"
+  }
+]

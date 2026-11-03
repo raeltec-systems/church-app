@@ -1,0 +1,12 @@
+{
+  "source_parent": "1a449aca8c6bdf8367421efa5292d35224b71526",
+  "changes": "test-only CRLF splitter and safe rehearsal error diagnostics",
+  "node": "22.16.0",
+  "exit": 0,
+  "started_at": "2026-10-31T14:27:37.440630+00:00",
+  "finished_at": "2026-10-31T14:27:54.014416+00:00",
+  "changed_file_sha256": {
+    "tools/auth-harness/recovery.test.mjs": "d1eef2528425a9d2b4a5e67700363a6324f6c27ac00d81b9d37d5b31fd4efc4c",
+    "tools/identity-e2e/admin-onboarding.mjs": "cf1886fa5e7590718dbeef849ab9fd450d0d9e7180f31693fb122188f1ce7d4f"
+  }
+}

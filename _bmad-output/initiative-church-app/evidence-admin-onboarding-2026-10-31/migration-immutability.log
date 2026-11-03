@@ -1,0 +1,2 @@
+check-migrations: 0 new migration(s) since base
+check-migrations: 101 migration(s) ordered, unique and non-destructive (base origin/main)

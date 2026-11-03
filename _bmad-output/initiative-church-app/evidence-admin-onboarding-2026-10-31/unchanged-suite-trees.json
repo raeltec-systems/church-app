@@ -1,0 +1,34 @@
+{
+  "71363c15332b8d2138494c57ec75f92c59252029": {
+    "supabase": "c87e35a071abf4dbf2cc7d8c8d1d3c16e1b6271c",
+    "tools": "542a4f6fe39a7e26804b53f032605e9e5f8cd53e",
+    "packages/design_system": "16084bedbaad7d34f5b6693a0a52335d7e428f68",
+    "packages/contracts": "489059ad0cc960be478b5c51f66489d7a62966cd",
+    "trials/staff_web": "b5262da346459e3225e5370ae1ad40cbab0b98ee",
+    "apps/mobile": "eee54acab97e5b3c1c219bdae2d75e2e0c0ea626"
+  },
+  "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1": {
+    "supabase": "c87e35a071abf4dbf2cc7d8c8d1d3c16e1b6271c",
+    "tools": "542a4f6fe39a7e26804b53f032605e9e5f8cd53e",
+    "packages/design_system": "16084bedbaad7d34f5b6693a0a52335d7e428f68",
+    "packages/contracts": "489059ad0cc960be478b5c51f66489d7a62966cd",
+    "trials/staff_web": "b5262da346459e3225e5370ae1ad40cbab0b98ee",
+    "apps/mobile": "eee54acab97e5b3c1c219bdae2d75e2e0c0ea626"
+  },
+  "4e28f6f1b3e09f63b774538fb01aef80ecb66a6c": {
+    "supabase": "c87e35a071abf4dbf2cc7d8c8d1d3c16e1b6271c",
+    "tools": "542a4f6fe39a7e26804b53f032605e9e5f8cd53e",
+    "packages/design_system": "16084bedbaad7d34f5b6693a0a52335d7e428f68",
+    "packages/contracts": "489059ad0cc960be478b5c51f66489d7a62966cd",
+    "trials/staff_web": "b5262da346459e3225e5370ae1ad40cbab0b98ee",
+    "apps/mobile": "eee54acab97e5b3c1c219bdae2d75e2e0c0ea626"
+  },
+  "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4": {
+    "supabase": "c87e35a071abf4dbf2cc7d8c8d1d3c16e1b6271c",
+    "tools": "542a4f6fe39a7e26804b53f032605e9e5f8cd53e",
+    "packages/design_system": "16084bedbaad7d34f5b6693a0a52335d7e428f68",
+    "packages/contracts": "489059ad0cc960be478b5c51f66489d7a62966cd",
+    "trials/staff_web": "b5262da346459e3225e5370ae1ad40cbab0b98ee",
+    "apps/mobile": "eee54acab97e5b3c1c219bdae2d75e2e0c0ea626"
+  }
+}

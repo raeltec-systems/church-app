@@ -172,7 +172,9 @@ test('committed scenarios only use the r13 synthetic accounts and known commands
   const files = readdirSync(dir).filter((f) => f.startsWith('1.3-'));
   assert.ok(files.length >= 2);
   for (const f of files) {
-    for (const raw of readFileSync(join(dir, f), 'utf8').split('\n')) {
+    // Git's Windows checkout uses CRLF. Strip the line ending before parsing
+    // comments; keep the exact command/account/secret assertions unchanged.
+    for (const raw of readFileSync(join(dir, f), 'utf8').split(/\r?\n/)) {
       const line = raw.replace(/#.*$/, '').trim();
       if (!line || line.startsWith('@sleep')) continue;
       const [cmd] = line.replace(/^\?/, '').split(/\s+/);

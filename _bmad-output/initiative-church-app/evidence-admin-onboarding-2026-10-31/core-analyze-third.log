@@ -1,0 +1,3 @@
+Analyzing client_core...
+
+   info - Statements in an if should be enclosed in a block. Try wrapping the statement in a block - lib\src\adapters\supabase_admin_onboarding_repository.dart:58:11 - curly_braces_in_flow_control_structures

@@ -1,0 +1,103 @@
+00:00 +0: loading C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart
+00:00 +0: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: (setUpAll)
+00:00 +0: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: signed-out staff can reach owner setup without a privileged session
+00:01 +1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: staff work areas fold to keep the sidebar short
+00:01 +2: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: Admin opens workspace, selects a person and grants only to that person
+00:01 +3: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: Admin opens workspace, selects a person and grants only to that person
+00:02 +4: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: reminder health maps each server refusal to its own message
+00:02 +5: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: reminder health maps each server refusal to its own message
+00:02 +6: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: reminder health maps each server refusal to its own message
+00:02 +7: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +8: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +9: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +10: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +11: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +12: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +13: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +14: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +15: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/admin_entry_points_test.dart: 390 by 844 workspace with large text retains its actions
+00:02 +16: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: entry 6.16: a sermon editor deep link opens Content selected
+00:02 +17: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.8: Sunday hymns for Admin, Media and worship leaders
+00:02 +18: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.6: Bible imports are for Media, Pastor and Admin
+00:02 +19: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.6: a Media editor opens Bible imports
+00:03 +20: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.2: a Media member opens Banners from the sidebar
+00:03 +21: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.3: Giving for Admins only, in the Content group
+00:03 +22: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.3: an Admin opens Giving from the sidebar and cannot verify their own save
+00:03 +23: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.3: a Media member has no Giving entry and is told who manages it
+00:03 +24: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.1: a Media member opens Events from the sidebar and drafts an event
+00:04 +25: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.13: Announcements for Media, Pastor and Admin only
+00:04 +26: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.13: a Media member opens Announcements from the sidebar; a plain member has no entry
+00:04 +27: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 6.13: a plain member sees no Announcements entry
+00:04 +28: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: reminder health renders aggregate status for an authorized read
+00:04 +29: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:05 +30: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.2: refresh and resume keep the session; a session the server no longer trusts is ended and its state cleared
+00:05 +31: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: unconfigured build explains itself and does not send commands
+00:05 +32: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: synthetic read/write fixture: create, change, conflict kept
+00:05 +33: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.3: the sidebar follows the server's current grants at the next navigation (grant, then revoke in another tab)
+00:06 +34: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 4.1: Duties follows a department scope and Departments the Admin grant; a cell scope gives neither
+00:06 +35: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 4.6: My follow-ups follows member access, Follow-ups a leader scope and Follow-up routing the Admin grant
+00:06 +36: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 4.7: a supervisor's overdue alert opens the follow-up task
+00:07 +37: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 4.8: a leader's overdue alert opens the Duties board
+00:07 +38: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 4.3: Rota follows the department scope and opens the rota grid
+00:07 +39: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 4.9: Coverage follows the department scope and opens the queue
+00:07 +40: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.5: Members & applications follows the Admin grant and opens the review queue
+00:08 +41: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.6: Cells follows the Admin grant and My cell group follows a cell scope
+00:08 +42: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: Admins see Recovery emails; the queue is the server answer
+00:08 +43: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.8: Admins see Access reviews; the queue is the server answer
+00:08 +44: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.9: Admins see Account recovery; the cases are the server answer
+00:09 +45: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.10: Admins see Membership status; deactivated members, login holds and handovers are the server answer
+00:09 +46: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.11: Admins see Member deletions; deletions and their steps are the server answer
+00:09 +47: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.11: a non-Admin opening Member deletions sees only the denial
+00:09 +48: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.10: a deactivated membership on staff web says so after sign-in
+00:09 +49: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 2.8: a held session on staff web sees only the help screen
+00:09 +50: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: an account switch drops the protected state
+00:09 +51: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: leaving and returning keeps this account's in-memory state (AD-13 clears it on account change, not on navigation)
+00:09 +52: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: a PointerDeviceKind.touch tap on a tab leaves no focus ring behind
+00:10 +53: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: a PointerDeviceKind.mouse tap on a tab leaves no focus ring behind
+00:10 +54: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: keyboard: Tab reaches the menu button, then the nav tabs; Enter navigates
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'Members'
+  Actual: 'Users & access'
+   Which: is different.
+          Expected: Members
+            Actual: Users & ac ...
+                    ^
+           Differ at offset 0
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart:1698:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart line 1698
+The test description was:
+  keyboard: Tab reaches the menu button, then the nav tabs; Enter navigates
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +54 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: keyboard: Tab reaches the menu button, then the nav tabs; Enter navigates [E]
+  Test failed. See exception logs above.
+  The test description was: keyboard: Tab reaches the menu button, then the nav tabs; Enter navigates
+
+00:10 +54 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: 2x text, desktop: both destinations render without overflow
+00:10 +55 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: 2x text, narrow: both destinations render without overflow
+00:10 +56 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: sidebar at 1x; top bar at 2x text on the same window
+00:11 +57 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: signed out: the sign-in landing with one way in, no navigation and no developer page
+00:11 +58 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: an Admin's Overview: figures from the existing reads, what needs attention, each opening the screen that resolves it
+00:11 +59 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: a cell leader's Overview: requests to join their cell; a read the server refused is a dash, never a zero
+00:11 +60 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: the sidebar folds to a rail of named icons and back; the choice lasts across screens and the content takes the width
+00:11 +61 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: the role switch appears only with two staff roles and narrows the sidebar to the role being viewed
+00:11 +62 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: only the composition root reaches Supabase; no client persistence
+00:11 +63 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: the app guard catches a shell that reaches the adapters
+00:11 +64 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 3.1: a member opens the Inbox and sees the server's item; signing out drops it
+00:11 +65 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 3.7: staff web shows markers, snooze and the same settings; a signal re-reads the inbox
+00:12 +66 -1: C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: story 3.7: a signed-out link to an item returns to it after sign-in
+00:12 +67 -1: Some tests failed.
+
+Failing tests:
+  C:/Users/Administrator/church-app-admin-onboarding/apps/staff/test/staff_app_test.dart: keyboard: Tab reaches the menu button, then the nav tabs; Enter navigates

@@ -82,6 +82,10 @@ Every runbook action is recorded with ids, codes and revisions only: no names, n
 
 ## RB1 First-Admin setup
 
+**New-installation path:** the owner-approved invitation wizard and restricted operator tooling are documented in [Admin onboarding operations](admin-onboarding-operations.md). Use that path only after its candidate is reviewed, promoted and configured. It works with public signup closed, preserves separate privacy/private-access gates, and permanently closes first-time setup after commissioning. The setup wizard is not last-Admin recovery.
+
+The legacy synthetic fixture procedure below describes the previously deployed staging workflow; it does not override the new permanent commissioning latch or authorise live-data seeding. For everyday administration use **Users & access** and the [normal staff walkthrough](admin-onboarding-user-management-walkthrough.md).
+
 **When:** a new environment (staging now, production at entry 14) has no usable Admin: `select app.identity_usable_admin_count();` returns 0.
 
 **Who:** the restricted operator, for a person the owner has named as first Admin. Then that first Admin, for the second.
@@ -92,7 +96,7 @@ Every runbook action is recorded with ids, codes and revisions only: no names, n
 - Identity's migrations are applied, and `tools/ci/verify-hosted.sql` passes.
 - The first Admin has their own approved member record with a live, usable account link:
   - **staging:** they create an account on mobile (**Account, Create account**) with a fictional number and their own password, and the operator links it with `app.identity_seed_synthetic_link` (SYNTHETIC names only; [identity-access.md, story 2.1](identity-access.md#seeding-a-synthetic-approved-member-restricted-operator-only));
-  - **production:** there is no path yet. Applications need an Admin to approve them, and the synthetic seeding refuses production. Naming and linking the first real Admin is an entry 14 decision and needs a reviewed operator procedure that approves that one application after the owner's identity check. Do not improvise it with SQL. The options are set out for the owner in [production-promotion-identity.md](production-promotion-identity.md#open-question-for-the-owner-the-first-real-admin-from-212-rb1).
+  - **production:** use the reviewed owner-invited setup wizard after its controlled promotion and approved data/notice prerequisites. Do not substitute synthetic seeding or hand-edited account/member rows. The [production onboarding decision](production-promotion-identity.md#owner-approved-first-admin-onboarding-31-october-2026) records the approved direction; deployment and acceptance remain separate.
 
 **Steps:**
 

@@ -1,0 +1,14 @@
+[
+  {
+    "file": "analysis.log",
+    "captured_sha256": "e90bd5dea9c764cc0627ee7ed06b5c81876f55368e67e16485981256c633fa82",
+    "published_sha256": "1a4d58742f0c8c6a450718638e92c74ae96b76f038299989547a38833f03ae6a",
+    "normalization": "UTF-8/LF and trailing-whitespace removal; no content/result changes"
+  },
+  {
+    "file": "focused-tests.log",
+    "captured_sha256": "b96a959c319930a78a6ad241afbf34d4f9773e9a94a78a1278b67fc258617cb1",
+    "published_sha256": "b96a959c319930a78a6ad241afbf34d4f9773e9a94a78a1278b67fc258617cb1",
+    "normalization": "UTF-8/LF and trailing-whitespace removal; no content/result changes"
+  }
+]

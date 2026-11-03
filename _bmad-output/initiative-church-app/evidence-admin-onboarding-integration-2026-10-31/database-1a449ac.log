@@ -1,0 +1,99 @@
+Connecting to local database...
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/admin_onboarding_completion_test.sql ....... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/admin_onboarding_existing_test.sql ......... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/admin_onboarding_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/assisted_recovery_test.sql ................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cell_membership_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_absence_notices_test.sql ............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_meeting_records_test.sql ............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_meeting_reminders_test.sql ........... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_meetings_test.sql .................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_my_meetings_test.sql ................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_programme_publish_test.sql ........... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_programme_revisions_test.sql ......... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_programmes_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_transfer_effects_test.sql ............ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cells_youre_on_test.sql .................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/command_foundation_test.sql ................ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_announcements_test.sql ............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_banners_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_bible_test.sql ..................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_event_duty_links_test.sql .......... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_event_rsvp_test.sql ................ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_events_test.sql .................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_giving_test.sql .................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_hymn_lists_test.sql ................ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_public_search_test.sql ............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_retention_test.sql ................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_sermon_duty_drafts_test.sql ........ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_sermon_facebook_test.sql ........... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/content_sermons_test.sql ...................
+# break](https://ebible.org/)
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/credential_review_test.sql ................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/cross_epic_contracts_test.sql .............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_comments_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_coverage_scale_test.sql .............
+# timings (ms): leader 250 = 182, pastor 40 departments = 444, admin 31 days (4,930 positions) = 574
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_coverage_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_history_kinds_test.sql .............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_lifecycle_scale_test.sql ............
+# timings (ms): hold 230 = 15, removal 30 = 83, deactivation 200 duties + 1030 tasks (25 handed over) = 1297, complete_handover 100 = 1156
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_lifecycle_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_outcomes_scale_test.sql .............
+# timings (ms): history self = 32, history by leader = 30, late page = 25, outcomes fortnight = 264, outcomes 31 days = 212, walk of 8 pages max = 26
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_outcomes_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_overlaps_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_owner_decisions_test.sql ............
+# timing: flag 63 duties and queue their notices: 99 ms
+# timing: leader board with 206 duties in D: 367 ms
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_owner_operations_scale_test.sql .....
+# timings (ms): flag 400 = 443, event links = 13, board = 1025, create part = 316, revise part = 320, owner read = 10, My duties = 114
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_owner_operations_test.sql ........... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_reminders_scale_test.sql ............
+# timings (ms): publish 26 = 408, publish 200 = 3163, accept 50 = 555
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_reminders_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_responses_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_revisions_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_rota_test.sql ....................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_special_assignments_scale_test.sql ..
+# timings (ms): special assignments = 504, candidates 1000 = 1976
+ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_special_assignments_test.sql ........ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/duties_tracer_test.sql ..................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/followups_registry_test.sql ................ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/followups_reminders_test.sql ............... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/identity_admin_fallback_test.sql ........... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/identity_grants_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/identity_live_access_test.sql .............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/identity_session_trust_test.sql ............ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/identity_staging_member_names_test.sql ..... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/member_deletion_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/membership_applications_test.sql ........... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/membership_lifecycle_test.sql .............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/membership_review_test.sql ................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_health_test.sql .............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_inbox_screens_test.sql ....... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_inbox_test.sql ............... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_push_test.sql ................ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_routing_test.sql ............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_scheduling_test.sql .......... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_source_contracts_test.sql .... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/notifications_worker_test.sql .............. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/platform_status_test.sql ................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/recovery_email_test.sql .................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/recovery_journal_test.sql .................. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/retired_objects_ledger_test.sql ............ ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/system_access_test.sql ..................... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/user_management_test.sql ................... ok
+All tests successful.
+Files=76, Tests=5937, 135 wallclock secs ( 0.87 usr  0.22 sys +  1.02 cusr  0.84 csys =  2.95 CPU)
+Result: PASS
+A new version of Supabase CLI is available: v2.122.0 (currently installed v2.119.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

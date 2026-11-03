@@ -96,6 +96,7 @@ select results_eq(
 select results_eq($$select command, purpose from app.sys_command_kinds order by 1$$,
   $$values ('content.asset_retention_claim'::text, 'content_asset_retention'::text),
            ('content.asset_retention_finalize', 'content_asset_retention'),
+           ('identity.admin_setup', 'identity_admin_onboarding'),
            ('identity.assisted_recovery_request', 'identity_assisted_recovery'),
            ('identity.assisted_recovery_status', 'identity_assisted_recovery'),
            ('identity.assisted_reset_begin', 'identity_assisted_recovery'),
@@ -117,7 +118,7 @@ select results_eq($$select command, purpose from app.sys_command_kinds order by 
            ('notifications.push_release', 'notifications_worker'),
            ('notifications.release', 'notifications_worker'),
            ('system.synthetic_probe', 'synthetic_probe')$$,
-  'the system allowlist is purpose-separated across Content retention, assisted recovery, deletion and notification worker commands');
+  'the system allowlist is purpose-separated across owner-invited commissioning, Content retention, assisted recovery, deletion and notification worker commands');
 
 -- Operators, gates and alert status ------------------------------------------------------------
 select results_eq($$select operator from app.ops_operators where active$$,

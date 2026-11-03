@@ -1,0 +1,1 @@
+environments: 3 configs valid (separate refs, synthetic non-production recipients, production private/sending disabled, bounded system route, alerting/scheduler off, isolated restores with real-data backups off)

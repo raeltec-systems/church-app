@@ -1,0 +1,37 @@
+00:00 +0: loading C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart
+00:00 +0: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +1: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +2: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +3: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +4: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +5: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +6: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +7: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +8: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +9: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +10: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +11: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +12: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +13: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +14: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +15: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: zero rows shows the empty state, distinct from an error
+00:00 +16: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: unreachable shows the error panel; Try again re-requests
+00:00 +17: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: a server error is reported differently from no network
+00:00 +18: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: reload hides the old value while the new request runs
+00:01 +19: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/platform_status/platform_status_screen_test.dart: actions meet the minimum tap target
+00:01 +20: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +21: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: arrow/Home/End/Control keys move focus and clamp at all edges
+00:04 +22: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: keyboard moves scroll the focused slot into view
+00:04 +23: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: a saved status shows in grid, list and CSV, and is announced after close
+00:05 +24: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Cancel after changing member and status leaves the slot
+00:06 +25: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Escape after changing member and status leaves the slot
+00:06 +26: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: the list view shows every slot with a labelled Change button
+00:06 +27: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: the status filter narrows grid and list to matching slots
+00:07 +28: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: filters that match no slot say so and block export
+00:07 +29: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: export preview states scope, leaks no private field, and downloads
+00:07 +30: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: a failed download is reported, not claimed
+00:07 +31: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: all buttons and fields meet the 44 px target
+00:07 +32: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Grid view, both dialogs and the member menu fit at 200% text
+00:08 +33: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: List view, both dialogs and the member menu fit at 200% text
+00:08 +34: C:/Users/Administrator/church-app-admin-onboarding/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: shell opens on the rota trial and reaches the tracer tab
+00:08 +35: All tests passed!

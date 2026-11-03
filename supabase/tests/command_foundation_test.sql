@@ -100,6 +100,8 @@ select results_eq(
            ('api.identity_admin_membership_lifecycle'),
            ('api.identity_admin_recovery_cases'),
            ('api.identity_admin_recovery_email_queue'),
+           ('api.identity_admin_user_activity'), ('api.identity_admin_user_detail'),
+           ('api.identity_admin_users'),
            ('api.identity_application_command'),
            ('api.identity_credential_command'),
            ('api.identity_deletion_command'),
@@ -110,6 +112,7 @@ select results_eq(
            ('api.identity_my_recovery_email'),
            ('api.identity_recovery_command'),
            ('api.identity_recovery_email_command'), ('api.identity_review_command'),
+           ('api.identity_user_management_command'),
            ('api.notifications_command'), ('api.notifications_health'),
            ('api.notifications_my_inbox'), ('api.notifications_my_push_settings'),
            ('api.notifications_open_item'),
@@ -148,6 +151,8 @@ select results_eq(
            ('app.identity_admin_membership_lifecycle'),
            ('app.identity_admin_recovery_cases'),
            ('app.identity_admin_recovery_email_queue'),
+           ('app.identity_admin_user_activity'), ('app.identity_admin_user_detail'),
+           ('app.identity_admin_users'),
            ('app.identity_application_command'),
            ('app.identity_credential_command'),
            ('app.identity_deletion_command'),
@@ -158,11 +163,12 @@ select results_eq(
            ('app.identity_my_recovery_email'),
            ('app.identity_recovery_command'),
            ('app.identity_recovery_email_command'), ('app.identity_review_command'),
+           ('app.identity_user_management_command'),
            ('app.notifications_command'),
            ('app.notifications_my_inbox'), ('app.notifications_my_push_settings'),
            ('app.notifications_open_item'),
            ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads, editors'' reads and the member''s own favourites (6.1, 6.6, 6.8, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors'' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
+  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the current-Admin user directory/detail/activity reads and profile command, the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads, editors'' reads and the member''s own favourites (6.1, 6.6, 6.8, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors'' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

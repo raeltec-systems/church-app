@@ -1,0 +1,4 @@
+Analyzing client_core...
+
+   info - Statements in an if should be enclosed in a block. Try wrapping the statement in a block - lib\src\presentation\user_management_screen.dart:125:25 - curly_braces_in_flow_control_structures
+  error - The name 'RecoveryEmailAdminScreen' isn't a class. Try correcting the name to match an existing class - lib\src\presentation\user_management_screen.dart:144:29 - creation_with_non_type

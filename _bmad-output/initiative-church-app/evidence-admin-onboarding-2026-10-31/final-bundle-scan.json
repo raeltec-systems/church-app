@@ -1,0 +1,8 @@
+{
+  "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+  "observed_at_utc": "2026-10-31T11:47:26.231640+00:00",
+  "command": "node tools/ci/scan-secrets.mjs --bundle apps/staff/build/web trials/staff_web/build/web",
+  "exit": 0,
+  "output": "scan-secrets: clean (bundle mode, 92 files)",
+  "scope": "Client bundle scan; no hosted or device acceptance"
+}

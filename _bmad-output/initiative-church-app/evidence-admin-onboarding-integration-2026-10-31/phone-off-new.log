@@ -1,0 +1,1 @@
+supabase_auth_church-admin-backend-20261031: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)

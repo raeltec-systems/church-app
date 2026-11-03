@@ -1,3 +1,5 @@
+import '../domain/user_management.dart';
+
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +14,8 @@ import '../domain/membership_review.dart' show IdentityCheck, MemberRecord;
 /// modules recorded. Every action is checked by the server; staff never see
 /// a password, a reason given to the member or any care or finance content.
 class MembershipLifecycleScreen extends ConsumerStatefulWidget {
-  const MembershipLifecycleScreen({super.key});
+  const MembershipLifecycleScreen({super.key, this.target});
+  final UserDetail? target;
 
   @override
   ConsumerState<MembershipLifecycleScreen> createState() =>
@@ -99,7 +102,14 @@ class _MembershipLifecycleScreenState
         ..addAll(
           _section(
             'Deactivated memberships',
-            [for (final m in o.deactivated) _deactivated(context, m, s.busy)],
+            [
+              for (final m in o.deactivated.where(
+                (x) =>
+                    widget.target == null ||
+                    x.memberId == widget.target!.member.id,
+              ))
+                _deactivated(context, m, s.busy),
+            ],
             'No membership is deactivated.',
             'lifecycle-no-deactivated',
           ),
@@ -107,7 +117,14 @@ class _MembershipLifecycleScreenState
         ..addAll(
           _section(
             'Login holds',
-            [for (final h in o.loginHolds) _loginHold(context, h, s.busy)],
+            [
+              for (final h in o.loginHolds.where(
+                (x) =>
+                    widget.target == null ||
+                    x.memberId == widget.target!.member.id,
+              ))
+                _loginHold(context, h, s.busy),
+            ],
             'No login is on hold.',
             'lifecycle-no-login-holds',
           ),
@@ -117,19 +134,21 @@ class _MembershipLifecycleScreenState
             'Pending handovers',
             [
               for (final (i, h) in o.handovers.indexed)
-                _handover(
-                  context,
-                  h,
-                  s.busy,
-                  // One Continue button per member who left (Follow-ups).
-                  first: !o.handovers
-                      .take(i)
-                      .any(
-                        (x) =>
-                            x.memberId == h.memberId &&
-                            x.ownerModule == h.ownerModule,
-                      ),
-                ),
+                if (widget.target == null ||
+                    h.memberId == widget.target!.member.id)
+                  _handover(
+                    context,
+                    h,
+                    s.busy,
+                    // One Continue button per member who left (Follow-ups).
+                    first: !o.handovers
+                        .take(i)
+                        .any(
+                          (x) =>
+                              x.memberId == h.memberId &&
+                              x.ownerModule == h.ownerModule,
+                        ),
+                  ),
             ],
             'Nothing is waiting to be handed over.',
             'lifecycle-no-handovers',
@@ -340,6 +359,15 @@ class _MembershipLifecycleScreenState
   static String _label(String code) => code.replaceAll('_', ' ');
 
   List<Widget> _find(BuildContext context, MembershipLifecycleState s) {
+    final target = widget.target;
+    if (target != null) {
+      if (target.ownRecord ||
+          target.member.membership != 'approved' ||
+          target.member.deletionPending) {
+        return const [];
+      }
+      return [_target(context, target.member.record, s.busy)];
+    }
     final found = s.search;
     return [
       Semantics(

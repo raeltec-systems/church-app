@@ -1,0 +1,22 @@
+00:00 +0: loading C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart
+00:00 +0: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens light text pairs meet 4.5:1
+00:00 +1: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens light focus ring is >=3:1 against bg and surface
+00:00 +2: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens dark text pairs meet 4.5:1
+00:00 +3: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens dark focus ring is >=3:1 against bg and surface
+00:00 +4: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens staff chrome (light only) meets contrast on navy
+00:00 +5: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens design-contract values are carried verbatim
+00:00 +6: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: tokens themes expose the tokens; staff is light only
+00:00 +7: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: FocusRing shows a ring only while its control has focus
+00:00 +8: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +9: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +10: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +11: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: filter pills: counts, one checked, a 44 px target each
+00:00 +12: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: RadioSegments exposes a named radio group with checked state
+00:00 +13: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: filter pills scroll sideways in one row on a phone
+00:00 +14: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: filter pills scroll sideways in one row on a phone
+00:00 +15: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: banner and status label survive 2x text without overflow
+00:01 +16: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: a table header is grey sentence case; numbers end right
+00:01 +17: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/design_system_test.dart: bottom tab labels stay on one line at double text size
+00:01 +18: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: a progress bar has no stub at zero
+00:01 +19: C:/Users/Administrator/church-app-admin-onboarding/packages/design_system/test/staff_components_test.dart: confirmation names the action and waits for an answer
+00:01 +20: All tests passed!

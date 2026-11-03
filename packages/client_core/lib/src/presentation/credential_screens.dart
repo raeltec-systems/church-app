@@ -1,3 +1,5 @@
+import '../domain/user_management.dart';
+
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -772,7 +774,8 @@ class _SignInDetailsScreenState extends ConsumerState<SignInDetailsScreen> {
 // ---------------------------------------------------------------------------
 
 class CredentialReviewScreen extends ConsumerStatefulWidget {
-  const CredentialReviewScreen({super.key});
+  const CredentialReviewScreen({super.key, this.target});
+  final UserDetail? target;
 
   @override
   ConsumerState<CredentialReviewScreen> createState() =>
@@ -902,7 +905,14 @@ class _CredentialReviewScreenState
         _section(
           context,
           'Requested changes',
-          [for (final item in q.changes) _change(context, item, s.busy)],
+          [
+            for (final item in q.changes.where(
+              (x) =>
+                  widget.target == null ||
+                  x.memberId == widget.target!.member.id,
+            ))
+              _change(context, item, s.busy),
+          ],
           'No sign-in change is waiting.',
           'credential-review-no-changes',
         ),
@@ -911,7 +921,14 @@ class _CredentialReviewScreenState
         _section(
           context,
           'Accounts in access review',
-          [for (final item in q.reviews) _review(context, item, s.busy)],
+          [
+            for (final item in q.reviews.where(
+              (x) =>
+                  widget.target == null ||
+                  x.memberId == widget.target!.member.id,
+            ))
+              _review(context, item, s.busy),
+          ],
           'No account waits for a credential review.',
           'credential-review-no-reviews',
         ),
@@ -920,7 +937,14 @@ class _CredentialReviewScreenState
         _section(
           context,
           'Holds',
-          [for (final h in q.holds) _hold(context, h, s.busy)],
+          [
+            for (final h in q.holds.where(
+              (x) =>
+                  widget.target == null ||
+                  x.memberId == widget.target!.member.id,
+            ))
+              _hold(context, h, s.busy),
+          ],
           'No account is on hold.',
           'credential-review-no-holds',
         ),
@@ -1173,6 +1197,15 @@ class _CredentialReviewScreenState
   }
 
   List<Widget> _placeHold(BuildContext context, CredentialReviewState s) {
+    final target = widget.target;
+    if (target != null) {
+      if (target.ownRecord ||
+          target.member.membership != 'approved' ||
+          target.member.deletionPending) {
+        return const [];
+      }
+      return [_holdTarget(context, target.member.record, s.busy)];
+    }
     final found = s.search;
     return [
       Semantics(

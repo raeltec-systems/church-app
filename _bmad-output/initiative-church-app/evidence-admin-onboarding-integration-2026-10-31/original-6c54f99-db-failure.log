@@ -1,0 +1,135 @@
+Connecting to local database...
+psql:/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/admin_onboarding_test.sql:49: ERROR:  personal-data approval and reviewed notice are required
+CONTEXT:  PL/pgSQL function app.identity_admin_setup_issue(text,text,uuid,boolean,text,text,text) line 20 at RAISE
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/admin_onboarding_test.sql ..................
+# Failed test 1: "this suite is for an isolated local database"
+#         have: production
+#         want: local
+# Failed test 13: "fictional enrollment uses an explicitly synthetic notice"
+#     (test result was NULL)
+Dubious, test returned 3 (wstat 768, 0x300)
+Failed 2/17 subtests
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/assisted_recovery_test.sql ................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cell_membership_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_absence_notices_test.sql ............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_meeting_records_test.sql ............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_meeting_reminders_test.sql ........... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_meetings_test.sql .................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_my_meetings_test.sql ................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_programme_publish_test.sql ........... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_programme_revisions_test.sql ......... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_programmes_test.sql .................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_transfer_effects_test.sql ............ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cells_youre_on_test.sql .................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/command_foundation_test.sql ................
+# Failed test 17: "authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads, editors' reads and the member's own favourites (6.1, 6.6, 6.8, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)"
+#     Results differ beginning at row 68:
+#         have: (api.identity_admin_user_activity)
+#         want: (api.identity_application_command)
+# Looks like you failed 1 test of 70
+Failed 1/70 subtests
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_announcements_test.sql ............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_banners_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_bible_test.sql ..................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_event_duty_links_test.sql .......... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_event_rsvp_test.sql ................ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_events_test.sql .................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_giving_test.sql .................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_hymn_lists_test.sql ................ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_public_search_test.sql ............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_retention_test.sql ................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_sermon_duty_drafts_test.sql ........ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_sermon_facebook_test.sql ........... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/content_sermons_test.sql ...................
+# break](https://ebible.org/)
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/credential_review_test.sql ................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/cross_epic_contracts_test.sql .............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_comments_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_coverage_scale_test.sql .............
+# timings (ms): leader 250 = 107, pastor 40 departments = 296, admin 31 days (4,930 positions) = 535
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_coverage_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_history_kinds_test.sql .............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_lifecycle_scale_test.sql ............
+# timings (ms): hold 230 = 16, removal 30 = 84, deactivation 200 duties + 1030 tasks (25 handed over) = 1328, complete_handover 100 = 1150
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_lifecycle_test.sql .................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_outcomes_scale_test.sql .............
+# timings (ms): history self = 40, history by leader = 33, late page = 25, outcomes fortnight = 259, outcomes 31 days = 248, walk of 8 pages max = 30
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_outcomes_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_overlaps_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_owner_decisions_test.sql ............
+# timing: flag 63 duties and queue their notices: 65 ms
+# timing: leader board with 206 duties in D: 397 ms
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_owner_operations_scale_test.sql .....
+# timings (ms): flag 400 = 461, event links = 11, board = 790, create part = 327, revise part = 334, owner read = 9, My duties = 116
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_owner_operations_test.sql ........... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_reminders_scale_test.sql ............
+# timings (ms): publish 26 = 395, publish 200 = 3142, accept 50 = 698
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_reminders_test.sql .................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_responses_test.sql .................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_revisions_test.sql .................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_rota_test.sql ....................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_special_assignments_scale_test.sql ..
+# timings (ms): special assignments = 572, candidates 1000 = 1969
+ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_special_assignments_test.sql ........ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/duties_tracer_test.sql ..................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/followups_registry_test.sql ................ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/followups_reminders_test.sql ............... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/identity_admin_fallback_test.sql ........... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/identity_grants_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/identity_live_access_test.sql .............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/identity_session_trust_test.sql ............ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/identity_staging_member_names_test.sql ..... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/member_deletion_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/membership_applications_test.sql ........... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/membership_lifecycle_test.sql .............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/membership_review_test.sql ................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_health_test.sql .............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_inbox_screens_test.sql ....... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_inbox_test.sql ............... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_push_test.sql ................
+# Failed test 3: "every other system command keeps its replayable result"
+#         have: 2
+#         want: 1
+# Looks like you failed 1 test of 109
+Failed 1/109 subtests
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_routing_test.sql ............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_scheduling_test.sql .......... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_source_contracts_test.sql .... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_worker_test.sql .............. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/platform_status_test.sql ................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/recovery_email_test.sql .................... ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/recovery_journal_test.sql .................. ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/retired_objects_ledger_test.sql ............ ok
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/system_access_test.sql .....................
+# Failed test 22: "the system allowlist is purpose-separated across Content retention, assisted recovery, deletion and notification worker commands"
+#     Results differ beginning at row 3:
+#         have: (identity.admin_setup,identity_admin_onboarding)
+#         want: (identity.assisted_recovery_request,identity_assisted_recovery)
+# Looks like you failed 1 test of 103
+Failed 1/103 subtests
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/user_management_test.sql ................... ok
+
+Test Summary Report
+-------------------
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/admin_onboarding_test.sql                (Wstat: 768 (exited 3) Tests: 17 Failed: 2)
+  Failed tests:  1, 13
+  Non-zero exit status: 3
+  Parse errors: No plan found in TAP output
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/command_foundation_test.sql              (Wstat: 0 Tests: 70 Failed: 1)
+  Failed test:  17
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/notifications_push_test.sql              (Wstat: 0 Tests: 109 Failed: 1)
+  Failed test:  3
+/Users/Administrator/church-admin-backend-local-20261031/supabase/tests/system_access_test.sql                   (Wstat: 0 Tests: 103 Failed: 1)
+  Failed test:  22
+Files=74, Tests=5873, 131 wallclock secs ( 0.84 usr  0.15 sys +  0.85 cusr  0.85 csys =  2.69 CPU)
+Result: FAIL
+error running container: exit 1
+Try rerunning the command with --debug to troubleshoot the error.
